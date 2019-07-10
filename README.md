@@ -28,7 +28,7 @@ but there are differences in efficiency, reliability, features, and flexibility.
 Killjoy assumes knowledge of systemd. For more information about systemd, see
 its [project page](https://freedesktop.org/wiki/Software/systemd/) and
 [systemd(1)](https://www.freedesktop.org/software/systemd/man/systemd.html),
-epsecially the section on
+especially the section on
 [concepts](https://www.freedesktop.org/software/systemd/man/systemd.html#Concepts).
 
 License
