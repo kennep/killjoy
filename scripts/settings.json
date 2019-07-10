@@ -1,0 +1,32 @@
+{
+    "version": 1,
+    "rules": [
+        {
+            "active_states": ["activating", "active", "deactivating", "inactive", "failed"],
+            "bus": "session",
+            "expression": "syncthing.service",
+            "expression_type": "unit name",
+            "notifiers": ["desktop popup"]
+        },
+        {
+            "active_states": ["activating", "active", "deactivating", "inactive", "failed"],
+            "bus": "session",
+            "expression": "dbus-org.freedesktop.Avahi.service",
+            "expression_type": "unit name",
+            "notifiers": ["desktop popup"]
+        },
+        {
+            "active_states": ["activating", "deactivating", "inactive", "failed"],
+            "bus": "system",
+            "expression": ".mount",
+            "expression_type": "unit type",
+            "notifiers": ["desktop popup"]
+        }
+    ],
+    "notifiers": {
+        "desktop popup": {
+            "bus": "session",
+            "bus_name": "org.freedesktop.Notifications"
+        }
+    }
+}
