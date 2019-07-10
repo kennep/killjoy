@@ -30,3 +30,8 @@ its [project page](https://freedesktop.org/wiki/Software/systemd/) and
 [systemd(1)](https://www.freedesktop.org/software/systemd/man/systemd.html),
 epsecially the section on
 [concepts](https://www.freedesktop.org/software/systemd/man/systemd.html#Concepts).
+
+License
+-------
+
+Killjoy is licensed under the GPLv3 or any later version.
