@@ -38,28 +38,15 @@ fn get_bus_types(settings: &Settings) -> Vec<dbus::BusType> {
 
 /// Connect to D-Bus buses, and maintain state machines for relevant units.
 ///
-/// More specifically, do the following:
+/// For each D-Bus bus listed in the settings argument, spawn and start a thread, and configure that
+/// thread to connect to one of the buses. At a high level, a thread monitors the interesting units
+/// accessible via that bus' systemd instance, and takes action when a unit enters an interesting
+/// state.
 ///
-/// 1.  For each D-Bus bus listed in the settings argument, create a connection
-///     to that bus, and let that connection subscribe to unit (dis)appearance
-///     announcements.
-/// 2.  Take turns checking in on each connection. If any unit (dis)appearance
-///     announcements are queued, process them by checking to see if any rules
-///     in the settings argument match and, if so, taking appropriate action.
-///
-///     Currently, "appropriate action" consists of checking to see whether any
-///     rules match that unit and, if so, printing to the console. In the
-///     future, it might involve creating a state machine and subscribing to
-///     unit state changes.
-///
-///     This function currently takes turns checking in on each connection. If
-///     any connection has an empty message queue for longer than a hard-coded
-///     wall-clock time, then the function checks in on the other connection,
-///     and on for infinity. This is kludgy, and it presents an obvious bug:
-///     what if a single connection consistently receives messages more
-///     frequently than the timeout? If so, only that connection will be
-///     serviced, and the other connections' will never be serviced. Parallelism
-///     would be of obvious use.
+/// Whether a unit is an "interesting unit," and whether it is entering an "interesting state," is
+/// defined by the rules in the settings file. Currently, taking action consists of printing a
+/// debugging message to the console. In the future, this will consist of reaching out across the
+/// D-Bus and contacting the appropriate notifier.
 pub fn run(settings: &Settings) {
     let handles: Vec<_> = get_bus_types(settings)
         .into_iter()
