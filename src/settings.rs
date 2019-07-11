@@ -10,19 +10,28 @@ use xdg::BaseDirectories;
 
 use crate::error::{ConfigFileNotFoundError, PathToUnicodeError};
 
+/// A D-Bus service that may be contacted when an event of interest happens.
+///
+/// When an event of interest occurs, killjoy will connect to `bus` and send a message to
+/// `bus_name`.
 #[derive(Clone, Debug, Deserialize)]
 pub struct Notifier {
     pub bus: String,
     pub bus_name: String,
 }
 
+/// Units to watch, and notifiers to contact when any of them enter a state of interest.
+///
+/// Upon startup, killjoy will connect to `bus`. It will watch all units whose name matches
+/// `expression` and `expression_type`. Whenever one of those units' ActiveState property
+/// transitions to one of the `active_states` it will contact `notifiers`.
 #[derive(Clone, Debug, Deserialize)]
 pub struct Rule {
-    pub bus: String,
-    pub expression_type: String,
-    pub expression: String,
-    pub notifiers: Vec<String>,
     pub active_states: Vec<String>,
+    pub bus: String,
+    pub expression: String,
+    pub expression_type: String,
+    pub notifiers: Vec<String>,
 }
 
 /// A deserialized copy of a configuration file.

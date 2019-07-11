@@ -18,18 +18,17 @@ const BUS_NAME_FOR_SYSTEMD: &'static str = "org.freedesktop.systemd1";
 const PATH_FOR_SYSTEMD: &'static str = "/org/freedesktop/systemd1";
 const INTERFACE_FOR_SYSTEMD_UNIT: &'static str = "org.freedesktop.systemd1.Unit";
 
-/// Watch units appear and disappear on a bus, and take actions in response.
+// Watch units appear and disappear on a bus, and take actions in response.
 pub struct BusWatcher {
     connection: dbus::Connection,
     settings: Settings,
 }
 
 impl BusWatcher {
-    /// Initialize a new monitor, but do not start watching units.
-    ///
-    /// To watch for units of interest, and to take action when those units of
-    /// interest transition to states of interest, call
-    /// [start](struct.BusWatcher.html).
+    // Initialize a new monitor, but do not start watching units.
+    //
+    // To watch for units of interest, and to take action when those units of interest transition to
+    // states of interest, call `run`.
     pub fn new(bus_type: dbus::BusType, settings: Settings) -> Self {
         let connection = dbus::Connection::get_private(bus_type)
             .expect(&format!("Failed to connect to {:?} D-Bus bus.", bus_type)[..]);
@@ -40,85 +39,85 @@ impl BusWatcher {
         }
     }
 
-    /// Track units of interest.
-    ///
-    /// Do the following:
-    ///
-    /// 1.  Subscribe to the `UnitRemoved` and `UnitNew` signals.
-    /// 2.  List extant units. For each interesting unit:
-    ///
-    ///     1.  Create a state machine for that unit.
-    ///     2.  Subscribe to the `PropertiesChanged` signal for that unit.
-    ///     3.  Get the unit's current state, and update the corresponding state machine.
-    ///
-    /// 3.  Infinitely process signals:
-    ///
-    ///     *   `UnitRemoved`: Delete the corresponding state machine, if it exists.
-    ///     *   `UnitNew`: If the unit is interesting, do the same as step 2, above.
-    ///     *   `PropertiesChanged`: Get the unit's current state, and update the corresponding
-    ///         state machine.
-    ///
-    /// An "interesting" unit is one that matches any of the monitoring rules provided by the user.
-    ///
-    /// Ordering matters. If the first two steps are swapped, then killjoy's behaviour could become
-    /// degenerate: it could miss units which appear while the list of extant units is being
-    /// processed.
-    ///
-    /// The ordering of step 2 also matters. If steps 2.2 and 2.3 are swapped, then killjoy's state
-    /// machines could fail to reflect reality:
-    ///
-    /// 1.   Killjoy asks for the state of a unit, and finds that it's OK.
-    /// 2.   The unit changes state. (Killjoy would not receive the signal.)
-    /// 3.   Killjoy subscribes to the `PropertiesChanged` signal for that unit.
-    ///
-    /// ----
-    ///
-    /// Remember that while D-Bus retains message ordering between peers, peers may send messages in
-    /// arbitrary order. If killjoy assumes that the order in which messages are received matches
-    /// the order in which events occurred, then its state machines can fail to reflect reality.
-    /// Consider the following example:
-    ///
-    /// 1.  Killjoy asks for the state of `foo.unittype`. Systemd receives the request and creates a
-    ///     response indicating that the unit is activating.
-    /// 2.  `foo.unittype` changes to the active state, and systemd emits a `PropertiesChanged`
-    ///     signal for that unit, where the signal includes the new unit state, "active." (The
-    ///     `changed_properties` attribute contains this information.)
-    /// 3.  Systemd sends the response created in step 1, where the response indicates that
-    ///     `foo.unittype` is activating.
-    ///
-    /// If killjoy naively assumes that message ordering reflects event ordering, then the state
-    /// machine for `foo.unittype` will end up with a state of "activating."
-    ///
-    /// One can resolve this issue by using timestamps. First, whenever getting the state of a unit,
-    /// make sure to also fetch the timestamp indicating when that state change occurred, and store
-    /// both the state and timestamp in the state machine. (`org.freedesktop.systemd1.Unit` has
-    /// several `*Timestamp*` properties.) Second, only update the state machine if the timestamp
-    /// retrieved from systemd is newer than the timestamp on the state machine. As applied to the
-    /// example above, these rules would ensure that the state machine for `foo.unittype` stays in
-    /// the "active" state, and does not transition to the "activating" state.
-    ///
-    /// Notice that killjoy's state machine for `foo.unittype` skips a transition. In most contexts,
-    /// for a state machine to skip a transition is a bug, as it means that the user-provided list
-    /// of rules won't be examined for a potential event of interest. However, if one assumes that
-    /// `PropertiesChanged` signals for a unit are emitted in the same order as underlying state
-    /// changes, then this skip can only occur during startup, when killjoy is both explicitly
-    /// requesting unit states and consuming `PropertiesChanged` signals. To skip state transitions
-    /// during start-up is non-ideal but acceptable, as prior to startup, units were not being
-    /// monitored anyway.
-    ///
-    /// Given all of the above, we can make the following statement:
-    ///
-    /// > With two caveats, all state changes for "interesting" units will be handled by killjoy.
-    ///
-    /// The caveats are:
-    ///
-    /// #.  When a unit is loaded into memory by systemd, there is a period of time during which
-    ///     killjoy will miss state changes.
-    /// #.  Killjoy may miss state changes that occur before startup is complete.
-    ///
-    /// Startup is complete when all unicast messages requesting unit states have been received a
-    /// response and been processed. After that point, all `PropertiesChanged` signals are either
-    /// out-of-date and discarded, or newer and useful.
+    // Track units of interest.
+    //
+    // Do the following:
+    //
+    // 1.  Subscribe to the `UnitRemoved` and `UnitNew` signals.
+    // 2.  List extant units. For each interesting unit:
+    //
+    //     1.  Create a state machine for that unit.
+    //     2.  Subscribe to the `PropertiesChanged` signal for that unit.
+    //     3.  Get the unit's current state, and update the corresponding state machine.
+    //
+    // 3.  Infinitely process signals:
+    //
+    //     *   `UnitRemoved`: Delete the corresponding state machine, if it exists.
+    //     *   `UnitNew`: If the unit is interesting, do the same as step 2, above.
+    //     *   `PropertiesChanged`: Get the unit's current state, and update the corresponding
+    //         state machine.
+    //
+    // An "interesting" unit is one that matches any of the monitoring rules provided by the user.
+    //
+    // Ordering matters. If the first two steps are swapped, then killjoy's behaviour could become
+    // degenerate: it could miss units which appear while the list of extant units is being
+    // processed.
+    //
+    // The ordering of step 2 also matters. If steps 2.2 and 2.3 are swapped, then killjoy's state
+    // machines could fail to reflect reality:
+    //
+    // 1.   Killjoy asks for the state of a unit, and finds that it's OK.
+    // 2.   The unit changes state. (Killjoy would not receive the signal.)
+    // 3.   Killjoy subscribes to the `PropertiesChanged` signal for that unit.
+    //
+    // ----
+    //
+    // Remember that while D-Bus retains message ordering between peers, peers may send messages in
+    // arbitrary order. If killjoy assumes that the order in which messages are received matches
+    // the order in which events occurred, then its state machines can fail to reflect reality.
+    // Consider the following example:
+    //
+    // 1.  Killjoy asks for the state of `foo.unittype`. Systemd receives the request and creates a
+    //     response indicating that the unit is activating.
+    // 2.  `foo.unittype` changes to the active state, and systemd emits a `PropertiesChanged`
+    //     signal for that unit, where the signal includes the new unit state, "active." (The
+    //     `changed_properties` attribute contains this information.)
+    // 3.  Systemd sends the response created in step 1, where the response indicates that
+    //     `foo.unittype` is activating.
+    //
+    // If killjoy naively assumes that message ordering reflects event ordering, then the state
+    // machine for `foo.unittype` will end up with a state of "activating."
+    //
+    // One can resolve this issue by using timestamps. First, whenever getting the state of a unit,
+    // make sure to also fetch the timestamp indicating when that state change occurred, and store
+    // both the state and timestamp in the state machine. (`org.freedesktop.systemd1.Unit` has
+    // several `*Timestamp*` properties.) Second, only update the state machine if the timestamp
+    // retrieved from systemd is newer than the timestamp on the state machine. As applied to the
+    // example above, these rules would ensure that the state machine for `foo.unittype` stays in
+    // the "active" state, and does not transition to the "activating" state.
+    //
+    // Notice that killjoy's state machine for `foo.unittype` skips a transition. In most contexts,
+    // for a state machine to skip a transition is a bug, as it means that the user-provided list
+    // of rules won't be examined for a potential event of interest. However, if one assumes that
+    // `PropertiesChanged` signals for a unit are emitted in the same order as underlying state
+    // changes, then this skip can only occur during startup, when killjoy is both explicitly
+    // requesting unit states and consuming `PropertiesChanged` signals. To skip state transitions
+    // during start-up is non-ideal but acceptable, as prior to startup, units were not being
+    // monitored anyway.
+    //
+    // Given all of the above, we can make the following statement:
+    //
+    // > With two caveats, all state changes for "interesting" units will be handled by killjoy.
+    //
+    // The caveats are:
+    //
+    // #.  When a unit is loaded into memory by systemd, there is a period of time during which
+    //     killjoy will miss state changes.
+    // #.  Killjoy may miss state changes that occur before startup is complete.
+    //
+    // Startup is complete when all unicast messages requesting unit states have been received a
+    // response and been processed. After that point, all `PropertiesChanged` signals are either
+    // out-of-date and discarded, or newer and useful.
     pub fn run(&self) {
         self.enable_systemd_signals();
 
