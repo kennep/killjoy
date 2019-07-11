@@ -10,7 +10,7 @@
 // *   Search for "ActiveState" in [The D-Bus API of systemd/PID
 //     1](https://www.freedesktop.org/wiki/Software/systemd/dbus/)
 // *   Read the "CONCEPTS" section in systemd(1).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ActiveState {
     Activating,
     Active,

@@ -10,6 +10,7 @@ use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusPropertiesProp
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1Manager;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1ManagerUnitNew as UnitNew;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1ManagerUnitRemoved as UnitRemoved;
+use crate::settings::ExpressionType;
 use crate::settings::{Rule, Settings};
 use crate::unit::{ActiveState, UnitStateMachine};
 use crate::VERBOSE;
@@ -429,10 +430,10 @@ impl BusWatcher {
     }
 }
 
-// Return the ActiveState enum entry corresponding to the given string.
-//
-// Return an error if the given string doesn't correspond to any enum entries.
-fn decode_active_state_str(active_state_str: &str) -> Result<ActiveState, String> {
+/// Return the ActiveState enum entry corresponding to the given string.
+///
+/// Return an error if the given string doesn't correspond to any enum entries.
+pub fn decode_active_state_str(active_state_str: &str) -> Result<ActiveState, String> {
     match active_state_str {
         "activating" => Ok(ActiveState::Activating),
         "active" => Ok(ActiveState::Active),
@@ -451,14 +452,10 @@ fn get_rules_matching_name<'a>(rules: &Vec<&'a Rule>, unit_name: &str) -> Vec<&'
     rules
         .iter()
         .map(|rule: &&Rule| *rule)
-        .filter(|rule: &&Rule| match &rule.expression_type[..] {
-            "unit name" => unit_name_matches_unit_name(&unit_name, &rule.expression),
-            "unit type" => unit_name_matches_unit_type(&unit_name, &rule.expression),
-            "regex" => unit_name_matches_regex(&unit_name, &rule.expression),
-            _ => panic!(format!(
-                "Unexpected expression type: {}",
-                rule.expression_type
-            )),
+        .filter(|rule: &&Rule| match rule.expression_type {
+            ExpressionType::Regex => unit_name_matches_regex(&unit_name, &rule.expression),
+            ExpressionType::UnitName => unit_name_matches_unit_name(&unit_name, &rule.expression),
+            ExpressionType::UnitType => unit_name_matches_unit_type(&unit_name, &rule.expression),
         })
         .collect()
 }
@@ -474,8 +471,7 @@ fn get_rules_matching_active_state<'a>(
         .filter(|rule: &&Rule| {
             rule.active_states
                 .iter()
-                .map(|active_state_str| decode_active_state_str(active_state_str).unwrap())
-                .any(|active_state| active_state == *target)
+                .any(|active_state| active_state == target)
         })
         .collect()
 }
@@ -593,9 +589,9 @@ mod tests {
     fn test_match_rules_and_names_v1() {
         let mut rules = vec![test_utils::gen_system_rule(), test_utils::gen_system_rule()];
         rules[0].expression = "foo.mount".to_owned();
-        rules[0].expression_type = "unit name".to_owned();
+        rules[0].expression_type = ExpressionType::UnitName;
         rules[1].expression = ".mount".to_owned();
-        rules[1].expression_type = "unit type".to_owned();
+        rules[1].expression_type = ExpressionType::UnitType;
         let borrowed_rules: Vec<&Rule> = rules.iter().collect();
 
         let unit_name = "bar.service";
@@ -611,9 +607,9 @@ mod tests {
     fn test_match_rules_and_names_v2() {
         let mut rules = vec![test_utils::gen_system_rule(), test_utils::gen_system_rule()];
         rules[0].expression = "foo.mount".to_owned();
-        rules[0].expression_type = "unit name".to_owned();
+        rules[0].expression_type = ExpressionType::UnitName;
         rules[1].expression = ".mount".to_owned();
-        rules[1].expression_type = "unit type".to_owned();
+        rules[1].expression_type = ExpressionType::UnitType;
         let borrowed_rules: Vec<&Rule> = rules.iter().collect();
 
         let unit_name = "bar.mount";
@@ -629,9 +625,9 @@ mod tests {
     fn test_match_rules_and_names_v3() {
         let mut rules = vec![test_utils::gen_system_rule(), test_utils::gen_system_rule()];
         rules[0].expression = "foo.mount".to_owned();
-        rules[0].expression_type = "unit name".to_owned();
+        rules[0].expression_type = ExpressionType::UnitName;
         rules[1].expression = ".mount".to_owned();
-        rules[1].expression_type = "unit type".to_owned();
+        rules[1].expression_type = ExpressionType::UnitType;
         let borrowed_rules: Vec<&Rule> = rules.iter().collect();
 
         let unit_name = "foo.mount";
@@ -646,9 +642,9 @@ mod tests {
     #[test]
     fn test_match_rules_and_active_state_v1() {
         let mut rules = vec![test_utils::gen_system_rule(), test_utils::gen_system_rule()];
-        rules[0].active_states.push("activating".to_string());
-        rules[0].active_states.push("active".to_string());
-        rules[1].active_states.push("active".to_string());
+        rules[0].active_states.insert(ActiveState::Activating);
+        rules[0].active_states.insert(ActiveState::Active);
+        rules[1].active_states.insert(ActiveState::Active);
         let borrowed_rules: Vec<&Rule> = rules.iter().collect();
 
         let active_state = ActiveState::Inactive;
@@ -661,9 +657,9 @@ mod tests {
     #[test]
     fn test_match_rules_and_active_state_v2() {
         let mut rules = vec![test_utils::gen_system_rule(), test_utils::gen_system_rule()];
-        rules[0].active_states.push("activating".to_string());
-        rules[0].active_states.push("active".to_string());
-        rules[1].active_states.push("active".to_string());
+        rules[0].active_states.insert(ActiveState::Activating);
+        rules[0].active_states.insert(ActiveState::Active);
+        rules[1].active_states.insert(ActiveState::Active);
         let borrowed_rules: Vec<&Rule> = rules.iter().collect();
 
         let active_state = ActiveState::Activating;
@@ -676,9 +672,9 @@ mod tests {
     #[test]
     fn test_match_rules_and_active_state_v3() {
         let mut rules = vec![test_utils::gen_system_rule(), test_utils::gen_system_rule()];
-        rules[0].active_states.push("activating".to_string());
-        rules[0].active_states.push("active".to_string());
-        rules[1].active_states.push("active".to_string());
+        rules[0].active_states.insert(ActiveState::Activating);
+        rules[0].active_states.insert(ActiveState::Active);
+        rules[1].active_states.insert(ActiveState::Active);
         let borrowed_rules: Vec<&Rule> = rules.iter().collect();
         let active_state = ActiveState::Active;
 

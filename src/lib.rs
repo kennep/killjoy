@@ -11,28 +11,23 @@ use std::collections::HashSet;
 use std::thread;
 
 use bus::BusWatcher;
-use settings::Settings;
+use dbus::BusType;
+use settings::{Rule, Settings};
 
 // How verbose should error messages be?
 const VERBOSE: bool = false;
 
-// Human-readable names for D-Bus buses.
-const SESSION_BUS_PROSE_NAME: &'static str = "session";
-const SYSTEM_BUS_PROSE_NAME: &'static str = "system";
-
-// Get all of the D-Bus bus types listed in the given settings object.
-fn get_bus_types(settings: &Settings) -> Vec<dbus::BusType> {
-    settings
-        .rules
+// Get a deduplicated list of D-Bus bus types in the given list of rules.
+fn get_bus_types(rules: &Vec<Rule>) -> Vec<BusType> {
+    // The conversion from BusType → String → BusType is a hack. It's done because this method
+    // should deduplicate BusType values, but BusType doesn't implement the traits necessary to
+    // create a HashSet<BusType>.
+    rules
         .iter()
-        .map(|rule| &rule.bus[..])
-        .collect::<HashSet<&str>>()
+        .map(|rule: &Rule| settings::encode_bus_type(&rule.bus_type))
+        .collect::<HashSet<String>>()
         .into_iter()
-        .filter_map(|bus| match bus {
-            SESSION_BUS_PROSE_NAME => Some(dbus::BusType::Session),
-            SYSTEM_BUS_PROSE_NAME => Some(dbus::BusType::System),
-            _ => None,
-        })
+        .map(|bus_type_str: String| settings::decode_bus_type_str(&bus_type_str[..]).unwrap())
         .collect()
 }
 
@@ -48,7 +43,7 @@ fn get_bus_types(settings: &Settings) -> Vec<dbus::BusType> {
 /// debugging message to the console. In the future, this will consist of reaching out across the
 /// D-Bus and contacting the appropriate notifier.
 pub fn run(settings: &Settings) {
-    let handles: Vec<_> = get_bus_types(settings)
+    let handles: Vec<_> = get_bus_types(&settings.rules)
         .into_iter()
         .map(|bus_type| {
             let settings_clone = settings.clone();
@@ -62,25 +57,26 @@ pub fn run(settings: &Settings) {
 
 #[cfg(test)]
 mod test_utils {
-    use crate::settings::Rule;
-    use crate::{SESSION_BUS_PROSE_NAME, SYSTEM_BUS_PROSE_NAME};
+    use crate::settings::{ExpressionType, Rule};
+    use dbus::BusType;
+    use std::collections::HashSet;
 
     pub fn gen_session_rule() -> Rule {
         Rule {
-            active_states: Vec::new(),
-            bus: SESSION_BUS_PROSE_NAME.to_owned(),
+            active_states: HashSet::new(),
+            bus_type: BusType::Session,
             expression: "".to_owned(),
-            expression_type: "".to_owned(),
+            expression_type: ExpressionType::UnitName,
             notifiers: Vec::new(),
         }
     }
 
     pub fn gen_system_rule() -> Rule {
         Rule {
-            active_states: Vec::new(),
-            bus: SYSTEM_BUS_PROSE_NAME.to_owned(),
+            active_states: HashSet::new(),
+            bus_type: BusType::System,
             expression: "".to_owned(),
-            expression_type: "".to_owned(),
+            expression_type: ExpressionType::UnitName,
             notifiers: Vec::new(),
         }
     }
@@ -97,11 +93,10 @@ mod tests {
         let settings = Settings {
             notifiers: HashMap::new(),
             rules: Vec::new(),
-            version: 1,
         };
-        let bus_types = get_bus_types(&settings);
-        assert!(!bus_types.contains(&dbus::BusType::Session));
-        assert!(!bus_types.contains(&dbus::BusType::System));
+        let bus_types = get_bus_types(&settings.rules);
+        assert!(!bus_types.contains(&BusType::Session));
+        assert!(!bus_types.contains(&BusType::System));
     }
 
     #[test]
@@ -109,11 +104,10 @@ mod tests {
         let settings = Settings {
             notifiers: HashMap::new(),
             rules: vec![test_utils::gen_session_rule()],
-            version: 1,
         };
-        let bus_types: Vec<dbus::BusType> = get_bus_types(&settings);
-        assert!(bus_types.contains(&dbus::BusType::Session));
-        assert!(!bus_types.contains(&dbus::BusType::System));
+        let bus_types: Vec<BusType> = get_bus_types(&settings.rules);
+        assert!(bus_types.contains(&BusType::Session));
+        assert!(!bus_types.contains(&BusType::System));
     }
 
     #[test]
@@ -121,11 +115,10 @@ mod tests {
         let settings = Settings {
             notifiers: HashMap::new(),
             rules: vec![test_utils::gen_system_rule()],
-            version: 1,
         };
-        let bus_types: Vec<dbus::BusType> = get_bus_types(&settings);
-        assert!(!bus_types.contains(&dbus::BusType::Session));
-        assert!(bus_types.contains(&dbus::BusType::System));
+        let bus_types: Vec<BusType> = get_bus_types(&settings.rules);
+        assert!(!bus_types.contains(&BusType::Session));
+        assert!(bus_types.contains(&BusType::System));
     }
 
     #[test]
@@ -136,10 +129,9 @@ mod tests {
                 test_utils::gen_session_rule(),
                 test_utils::gen_system_rule(),
             ],
-            version: 1,
         };
-        let bus_types: Vec<dbus::BusType> = get_bus_types(&settings);
-        assert!(bus_types.contains(&dbus::BusType::Session));
-        assert!(bus_types.contains(&dbus::BusType::System));
+        let bus_types: Vec<BusType> = get_bus_types(&settings.rules);
+        assert!(bus_types.contains(&BusType::Session));
+        assert!(bus_types.contains(&BusType::System));
     }
 }
