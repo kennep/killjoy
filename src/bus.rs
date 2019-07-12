@@ -10,7 +10,6 @@ use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusPropertiesProp
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1Manager;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1ManagerUnitNew as UnitNew;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1ManagerUnitRemoved as UnitRemoved;
-use crate::settings::Expression;
 use crate::settings::{Rule, Settings};
 use crate::unit::{ActiveState, UnitStateMachine};
 use crate::VERBOSE;
@@ -452,7 +451,7 @@ fn get_rules_matching_name<'a>(rules: &Vec<&'a Rule>, unit_name: &str) -> Vec<&'
     rules
         .iter()
         .map(|rule: &&Rule| *rule)
-        .filter(|rule: &&Rule| unit_name_matches_expression(&unit_name, &rule.expression))
+        .filter(|rule: &&Rule| rule.expression.matches(unit_name))
         .collect()
 }
 
@@ -488,15 +487,6 @@ fn rules_match_name(rules: &Vec<&Rule>, unit_name: &str) -> bool {
     get_rules_matching_name(rules, unit_name).len() > 0
 }
 
-// Check whether `unit_name` matches the given `expression`.
-fn unit_name_matches_expression(unit_name: &str, expression: &Expression) -> bool {
-    match expression {
-        Expression::Regex(expr) => expr.is_match(unit_name),
-        Expression::UnitName(expr) => unit_name == expr,
-        Expression::UnitType(expr) => unit_name.ends_with(expr),
-    }
-}
-
 // Wrap BUS_NAME_FOR_SYSTEMD.
 fn wrap_bus_name_for_systemd() -> BusName<'static> {
     BusName::new(BUS_NAME_FOR_SYSTEMD).unwrap()
@@ -511,56 +501,8 @@ fn wrap_path_for_systemd() -> Path<'static> {
 mod tests {
     use super::*;
 
+    use crate::settings::Expression;
     use crate::test_utils;
-    use regex::Regex;
-
-    #[test]
-    fn test_unit_name_matches_expression_v1() {
-        let unit_name = "aaa.service";
-        let expression = Expression::UnitName("aaa.service".to_string());
-        let res = unit_name_matches_expression(&unit_name, &expression);
-        assert!(res);
-    }
-
-    #[test]
-    fn test_unit_name_matches_expression_v2() {
-        let unit_name = "aaa.service";
-        let expression = Expression::UnitName(".service".to_string());
-        let res = unit_name_matches_expression(&unit_name, &expression);
-        assert!(!res);
-    }
-
-    #[test]
-    fn test_unit_name_matches_expression_v3() {
-        let unit_name = "aaa.service";
-        let expression = Expression::UnitType(".service".to_string());
-        let res = unit_name_matches_expression(&unit_name, &expression);
-        assert!(res);
-    }
-
-    #[test]
-    fn test_unit_name_matches_expression_v4() {
-        let unit_name = "aaa.service";
-        let expression = Expression::UnitType(".mount".to_string());
-        let res = unit_name_matches_expression(&unit_name, &expression);
-        assert!(!res);
-    }
-
-    #[test]
-    fn test_unit_name_matches_expression_v5() {
-        let unit_name = "aaa.service";
-        let expression = Expression::Regex(Regex::new(r"a\.ser").unwrap());
-        let res = unit_name_matches_expression(&unit_name, &expression);
-        assert!(res);
-    }
-
-    #[test]
-    fn test_unit_name_matches_expression_v6() {
-        let unit_name = "aaa.service";
-        let expression = Expression::Regex(Regex::new(r"b\.ser").unwrap());
-        let res = unit_name_matches_expression(&unit_name, &expression);
-        assert!(!res);
-    }
 
     // Let the unit name match zero of two rules.
     #[test]

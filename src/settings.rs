@@ -21,6 +21,17 @@ pub enum Expression {
     UnitType(String),
 }
 
+impl Expression {
+    /// Check whether `unit_name` matches this expression.
+    pub fn matches(&self, unit_name: &str) -> bool {
+        match &self {
+            Expression::Regex(expr) => expr.is_match(unit_name),
+            Expression::UnitName(expr) => unit_name == expr,
+            Expression::UnitType(expr) => unit_name.ends_with(expr),
+        }
+    }
+}
+
 /// A D-Bus service that may be contacted when an event of interest happens.
 ///
 /// When an event of interest occurs, killjoy will connect to `bus_type` and send a message to
@@ -259,5 +270,58 @@ pub fn encode_bus_type(bus_type: &BusType) -> String {
         BusType::Session => "session".to_string(),
         BusType::Starter => "starter".to_string(),
         BusType::System => "system".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_unit_name_matches_expression_v1() {
+        let unit_name = "aaa.service";
+        let expression = Expression::UnitName("aaa.service".to_string());
+        let res = expression.matches(&unit_name);
+        assert!(res);
+    }
+
+    #[test]
+    fn test_unit_name_matches_expression_v2() {
+        let unit_name = "aaa.service";
+        let expression = Expression::UnitName(".service".to_string());
+        let res = expression.matches(&unit_name);
+        assert!(!res);
+    }
+
+    #[test]
+    fn test_unit_name_matches_expression_v3() {
+        let unit_name = "aaa.service";
+        let expression = Expression::UnitType(".service".to_string());
+        let res = expression.matches(&unit_name);
+        assert!(res);
+    }
+
+    #[test]
+    fn test_unit_name_matches_expression_v4() {
+        let unit_name = "aaa.service";
+        let expression = Expression::UnitType(".mount".to_string());
+        let res = expression.matches(&unit_name);
+        assert!(!res);
+    }
+
+    #[test]
+    fn test_unit_name_matches_expression_v5() {
+        let unit_name = "aaa.service";
+        let expression = Expression::Regex(regex::Regex::new(r"a\.ser").unwrap());
+        let res = expression.matches(&unit_name);
+        assert!(res);
+    }
+
+    #[test]
+    fn test_unit_name_matches_expression_v6() {
+        let unit_name = "aaa.service";
+        let expression = Expression::Regex(regex::Regex::new(r"b\.ser").unwrap());
+        let res = expression.matches(&unit_name);
+        assert!(!res);
     }
 }
