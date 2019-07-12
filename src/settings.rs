@@ -278,7 +278,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_unit_name_matches_expression_v1() {
+    fn test_expression_matches_v1() {
         let unit_name = "aaa.service";
         let expression = Expression::UnitName("aaa.service".to_string());
         let res = expression.matches(&unit_name);
@@ -286,7 +286,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unit_name_matches_expression_v2() {
+    fn test_expression_matches_v2() {
         let unit_name = "aaa.service";
         let expression = Expression::UnitName(".service".to_string());
         let res = expression.matches(&unit_name);
@@ -294,7 +294,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unit_name_matches_expression_v3() {
+    fn test_expression_matches_v3() {
         let unit_name = "aaa.service";
         let expression = Expression::UnitType(".service".to_string());
         let res = expression.matches(&unit_name);
@@ -302,7 +302,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unit_name_matches_expression_v4() {
+    fn test_expression_matches_v4() {
         let unit_name = "aaa.service";
         let expression = Expression::UnitType(".mount".to_string());
         let res = expression.matches(&unit_name);
@@ -310,7 +310,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unit_name_matches_expression_v5() {
+    fn test_expression_matches_v5() {
         let unit_name = "aaa.service";
         let expression = Expression::Regex(regex::Regex::new(r"a\.ser").unwrap());
         let res = expression.matches(&unit_name);
@@ -318,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unit_name_matches_expression_v6() {
+    fn test_expression_matches_v6() {
         let unit_name = "aaa.service";
         let expression = Expression::Regex(regex::Regex::new(r"b\.ser").unwrap());
         let res = expression.matches(&unit_name);
