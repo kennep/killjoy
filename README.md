@@ -31,6 +31,10 @@ its [project page](https://freedesktop.org/wiki/Software/systemd/) and
 especially the section on
 [concepts](https://www.freedesktop.org/software/systemd/man/systemd.html#Concepts).
 
+Dependencies
+-------
+Most dependencies used by Killjoy are pure Rust libraries and are listed in 'Cargo.toml'. However, Killjoy requires libdbus to be installed on the system to function (libdbus-1-dev on Debian/Ubuntu distros).
+
 License
 -------
 
