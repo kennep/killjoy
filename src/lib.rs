@@ -57,7 +57,7 @@ pub fn run(settings: &Settings) {
 
 #[cfg(test)]
 mod test_utils {
-    use crate::settings::{ExpressionType, Rule};
+    use crate::settings::{Expression, Rule};
     use dbus::BusType;
     use std::collections::HashSet;
 
@@ -65,8 +65,7 @@ mod test_utils {
         Rule {
             active_states: HashSet::new(),
             bus_type: BusType::Session,
-            expression: "".to_owned(),
-            expression_type: ExpressionType::UnitName,
+            expression: Expression::UnitName("".to_string()),
             notifiers: Vec::new(),
         }
     }
@@ -75,8 +74,7 @@ mod test_utils {
         Rule {
             active_states: HashSet::new(),
             bus_type: BusType::System,
-            expression: "".to_owned(),
-            expression_type: ExpressionType::UnitName,
+            expression: Expression::UnitName("".to_string()),
             notifiers: Vec::new(),
         }
     }

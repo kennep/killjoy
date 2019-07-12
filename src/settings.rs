@@ -10,15 +10,15 @@ use serde::Deserialize;
 use xdg::BaseDirectories;
 
 use crate::bus;
-use crate::error::{ConfigFileNotFoundError, PathToUnicodeError};
+use crate::error::{ConfigFileDecodeError, ConfigFileNotFoundError, PathToUnicodeError};
 use crate::unit::ActiveState;
 
-/// The types of expressions that a user may use to match unit names.
+/// The expressions that a user may use to match unit names.
 #[derive(Clone, Debug)]
-pub enum ExpressionType {
-    Regex,
-    UnitName,
-    UnitType,
+pub enum Expression {
+    Regex(regex::Regex),
+    UnitName(String),
+    UnitType(String),
 }
 
 /// A D-Bus service that may be contacted when an event of interest happens.
@@ -34,14 +34,13 @@ pub struct Notifier {
 /// Units to watch, and notifiers to contact when any of them enter a state of interest.
 ///
 /// Upon startup, killjoy will connect to `bus_type`. It will watch all units whose name matches
-/// `expression` and `expression_type`. Whenever one of those units' ActiveState property
-/// transitions to one of the `active_states` it will contact `notifiers`.
+/// `expression`. Whenever one of those units' ActiveState property transitions to one of the
+/// `active_states` it will contact `notifiers`.
 #[derive(Clone, Debug)]
 pub struct Rule {
     pub active_states: HashSet<ActiveState>,
     pub bus_type: BusType,
-    pub expression: String,
-    pub expression_type: ExpressionType,
+    pub expression: Expression,
     pub notifiers: Vec<String>,
 }
 
@@ -176,14 +175,24 @@ impl SerdeRule {
         }
 
         let bus_type = decode_bus_type_str(&self.bus_type)?;
-        let expression = self.expression.to_owned();
-        let expression_type = decode_expression_type_str(&self.expression_type[..])?;
+
+        let expression: Expression = match &self.expression_type[..] {
+            "regex" => Expression::Regex(regex::Regex::new(&self.expression[..])?),
+            "unit name" => Expression::UnitName(self.expression.to_owned()),
+            "unit type" => Expression::UnitType(self.expression.to_owned()),
+            other => {
+                return Err(Box::new(ConfigFileDecodeError {
+                    text: other.to_owned(),
+                }))
+            }
+        };
+
         let notifiers = self.notifiers.to_owned();
+
         Ok(Rule {
             active_states,
             bus_type,
             expression,
-            expression_type,
             notifiers,
         })
     }
@@ -241,18 +250,6 @@ pub fn decode_bus_type_str(bus_type_str: &str) -> Result<BusType, String> {
         _ => Err(format!(
             "Failed to decode bus type string: {}",
             bus_type_str
-        )),
-    }
-}
-
-pub fn decode_expression_type_str(expression_type_str: &str) -> Result<ExpressionType, String> {
-    match expression_type_str {
-        "regex" => Ok(ExpressionType::Regex),
-        "unit name" => Ok(ExpressionType::UnitName),
-        "unit type" => Ok(ExpressionType::UnitType),
-        _ => Err(format!(
-            "Failed to decode expression type string: {}",
-            expression_type_str
         )),
     }
 }

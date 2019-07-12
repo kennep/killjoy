@@ -15,6 +15,24 @@ impl fmt::Display for ConfigFileNotFoundError {
     }
 }
 
+/// An error indicating that a configuration file could not be decoded.
+#[derive(Debug)]
+pub struct ConfigFileDecodeError {
+    pub text: String,
+}
+
+impl Error for ConfigFileDecodeError {}
+
+impl fmt::Display for ConfigFileDecodeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Failed to decode portion of configuration file: {}",
+            &self.text[..]
+        )
+    }
+}
+
 /// An error indicating that a file path could not be converted to a unicode string.
 #[derive(Debug)]
 pub struct PathToUnicodeError;

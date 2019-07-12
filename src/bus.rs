@@ -10,7 +10,7 @@ use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusPropertiesProp
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1Manager;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1ManagerUnitNew as UnitNew;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1ManagerUnitRemoved as UnitRemoved;
-use crate::settings::ExpressionType;
+use crate::settings::Expression;
 use crate::settings::{Rule, Settings};
 use crate::unit::{ActiveState, UnitStateMachine};
 use crate::VERBOSE;
@@ -452,11 +452,7 @@ fn get_rules_matching_name<'a>(rules: &Vec<&'a Rule>, unit_name: &str) -> Vec<&'
     rules
         .iter()
         .map(|rule: &&Rule| *rule)
-        .filter(|rule: &&Rule| match rule.expression_type {
-            ExpressionType::Regex => unit_name_matches_regex(&unit_name, &rule.expression),
-            ExpressionType::UnitName => unit_name_matches_unit_name(&unit_name, &rule.expression),
-            ExpressionType::UnitType => unit_name_matches_unit_type(&unit_name, &rule.expression),
-        })
+        .filter(|rule: &&Rule| unit_name_matches_expression(&unit_name, &rule.expression))
         .collect()
 }
 
@@ -492,18 +488,13 @@ fn rules_match_name(rules: &Vec<&Rule>, unit_name: &str) -> bool {
     get_rules_matching_name(rules, unit_name).len() > 0
 }
 
-// Check whether `unit_name` exactly matches `expression`.
-fn unit_name_matches_unit_name(unit_name: &str, expression: &str) -> bool {
-    unit_name == expression
-}
-
-// Check whether `unit_name` ends with `expression`.
-fn unit_name_matches_unit_type(unit_name: &str, expression: &str) -> bool {
-    unit_name.ends_with(expression)
-}
-
-fn unit_name_matches_regex(_unit_name: &str, _expression: &str) -> bool {
-    false
+// Check whether `unit_name` matches the given `expression`.
+fn unit_name_matches_expression(unit_name: &str, expression: &Expression) -> bool {
+    match expression {
+        Expression::Regex(expr) => expr.is_match(unit_name),
+        Expression::UnitName(expr) => unit_name == expr,
+        Expression::UnitType(expr) => unit_name.ends_with(expr),
+    }
 }
 
 // Wrap BUS_NAME_FOR_SYSTEMD.
@@ -519,68 +510,55 @@ fn wrap_path_for_systemd() -> Path<'static> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::test_utils;
+    use regex::Regex;
 
-    // Let the unit names match.
     #[test]
-    fn test_unit_name_matches_unit_name_v1() {
-        let unit_name = "aeiou";
-        let expression = "aeiou";
-        let res = unit_name_matches_unit_name(unit_name, expression);
+    fn test_unit_name_matches_expression_v1() {
+        let unit_name = "aaa.service";
+        let expression = Expression::UnitName("aaa.service".to_string());
+        let res = unit_name_matches_expression(&unit_name, &expression);
         assert!(res);
     }
 
-    // Let the unit name be missing the first letter.
     #[test]
-    fn test_unit_name_matches_unit_name_v2() {
-        let unit_name = "eiou";
-        let expression = "aeiou";
-        let res = unit_name_matches_unit_name(unit_name, expression);
+    fn test_unit_name_matches_expression_v2() {
+        let unit_name = "aaa.service";
+        let expression = Expression::UnitName(".service".to_string());
+        let res = unit_name_matches_expression(&unit_name, &expression);
         assert!(!res);
     }
 
-    // Let the unit name be missing the last letter.
     #[test]
-    fn test_unit_name_matches_unit_name_v3() {
-        let unit_name = "aeio";
-        let expression = "aeiou";
-        let res = unit_name_matches_unit_name(unit_name, expression);
-        assert!(!res);
-    }
-
-    // Let the unit name be missing an interior letter.
-    #[test]
-    fn test_unit_name_matches_unit_name_v4() {
-        let unit_name = "aeou";
-        let expression = "aeiou";
-        let res = unit_name_matches_unit_name(unit_name, expression);
-        assert!(!res);
-    }
-
-    // Let the unit name suffix match the expression.
-    #[test]
-    fn test_unit_name_matches_unit_type_v1() {
-        let unit_name = "foo.mount";
-        let expression = ".mount";
-        let res = unit_name_matches_unit_type(unit_name, expression);
+    fn test_unit_name_matches_expression_v3() {
+        let unit_name = "aaa.service";
+        let expression = Expression::UnitType(".service".to_string());
+        let res = unit_name_matches_expression(&unit_name, &expression);
         assert!(res);
     }
 
-    // Let the unit name suffix lack a dot.
     #[test]
-    fn test_unit_name_matches_unit_type_v2() {
-        let unit_name = "foomount";
-        let expression = ".mount";
-        let res = unit_name_matches_unit_type(unit_name, expression);
+    fn test_unit_name_matches_expression_v4() {
+        let unit_name = "aaa.service";
+        let expression = Expression::UnitType(".mount".to_string());
+        let res = unit_name_matches_expression(&unit_name, &expression);
         assert!(!res);
     }
 
-    // Let the unit name suffix lack its last letter.
     #[test]
-    fn test_unit_name_matches_unit_type_v3() {
-        let unit_name = "foo.moun";
-        let expression = ".mount";
-        let res = unit_name_matches_unit_type(unit_name, expression);
+    fn test_unit_name_matches_expression_v5() {
+        let unit_name = "aaa.service";
+        let expression = Expression::Regex(Regex::new(r"a\.ser").unwrap());
+        let res = unit_name_matches_expression(&unit_name, &expression);
+        assert!(res);
+    }
+
+    #[test]
+    fn test_unit_name_matches_expression_v6() {
+        let unit_name = "aaa.service";
+        let expression = Expression::Regex(Regex::new(r"b\.ser").unwrap());
+        let res = unit_name_matches_expression(&unit_name, &expression);
         assert!(!res);
     }
 
@@ -588,10 +566,8 @@ mod tests {
     #[test]
     fn test_match_rules_and_names_v1() {
         let mut rules = vec![test_utils::gen_system_rule(), test_utils::gen_system_rule()];
-        rules[0].expression = "foo.mount".to_owned();
-        rules[0].expression_type = ExpressionType::UnitName;
-        rules[1].expression = ".mount".to_owned();
-        rules[1].expression_type = ExpressionType::UnitType;
+        rules[0].expression = Expression::UnitName("foo.mount".to_owned());
+        rules[1].expression = Expression::UnitType(".mount".to_owned());
         let borrowed_rules: Vec<&Rule> = rules.iter().collect();
 
         let unit_name = "bar.service";
@@ -606,10 +582,8 @@ mod tests {
     #[test]
     fn test_match_rules_and_names_v2() {
         let mut rules = vec![test_utils::gen_system_rule(), test_utils::gen_system_rule()];
-        rules[0].expression = "foo.mount".to_owned();
-        rules[0].expression_type = ExpressionType::UnitName;
-        rules[1].expression = ".mount".to_owned();
-        rules[1].expression_type = ExpressionType::UnitType;
+        rules[0].expression = Expression::UnitName("foo.mount".to_owned());
+        rules[1].expression = Expression::UnitType(".mount".to_owned());
         let borrowed_rules: Vec<&Rule> = rules.iter().collect();
 
         let unit_name = "bar.mount";
@@ -624,10 +598,8 @@ mod tests {
     #[test]
     fn test_match_rules_and_names_v3() {
         let mut rules = vec![test_utils::gen_system_rule(), test_utils::gen_system_rule()];
-        rules[0].expression = "foo.mount".to_owned();
-        rules[0].expression_type = ExpressionType::UnitName;
-        rules[1].expression = ".mount".to_owned();
-        rules[1].expression_type = ExpressionType::UnitType;
+        rules[0].expression = Expression::UnitName("foo.mount".to_owned());
+        rules[1].expression = Expression::UnitType(".mount".to_owned());
         let borrowed_rules: Vec<&Rule> = rules.iter().collect();
 
         let unit_name = "foo.mount";
