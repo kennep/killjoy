@@ -36,7 +36,7 @@ fn handle_settings_load_path_subcommand() {
 
 // Handle the 'settings validate' subcommand.
 fn handle_settings_validate_subcommand() {
-    println!("Handling validate subcommand");
+    get_settings_or_exit();
 }
 
 // Handle no subcommand at all.
