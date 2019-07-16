@@ -55,43 +55,6 @@ pub struct Rule {
     pub notifiers: Vec<String>,
 }
 
-/// Read the configuration file into a [Settings](struct.Settings.html) object.
-///
-/// An error may be returned for one of two broad categories of reasons:
-///
-/// *   The file couldn't be opened. Maybe a settings file couldn't be found; or maybe a settings
-///     file was found but could not be opened.
-/// *   The file contained invalid contents. See [Settings::new](struct.Settings.html#method.new).
-pub fn load() -> Result<Settings, Box<dyn Error>> {
-    let load_path = get_load_path()?;
-    let handle = match File::open(load_path) {
-        Ok(handle) => handle,
-        Err(err) => return Err(Box::new(err)),
-    };
-    let reader = BufReader::new(handle);
-    let settings = Settings::new(reader)?;
-    Ok(settings)
-}
-
-/// Search several paths for a settings file, in order of preference.
-///
-/// If a file is found, return its path. Otherwise, return an error describing why.
-pub fn get_load_path() -> Result<String, Box<dyn Error>> {
-    let dirs = match BaseDirectories::with_prefix("killjoy") {
-        Ok(dirs) => dirs,
-        Err(err) => return Err(Box::new(err)),
-    };
-    let path_buf = match dirs.find_config_file("settings.json") {
-        Some(path_buf) => path_buf,
-        None => return Err(Box::new(ConfigFileNotFoundError)),
-    };
-    let path = match path_buf.to_str() {
-        Some(path) => path.to_string(),
-        None => return Err(Box::new(PathToUnicodeError)),
-    };
-    Ok(path)
-}
-
 /// A deserialized copy of a configuration file.
 ///
 /// Here's an example of what a configuration file may look like:
@@ -271,6 +234,43 @@ pub fn encode_bus_type(bus_type: &BusType) -> String {
         BusType::Starter => "starter".to_string(),
         BusType::System => "system".to_string(),
     }
+}
+
+/// Search several paths for a settings file, in order of preference.
+///
+/// If a file is found, return its path. Otherwise, return an error describing why.
+pub fn get_load_path() -> Result<String, Box<dyn Error>> {
+    let dirs = match BaseDirectories::with_prefix("killjoy") {
+        Ok(dirs) => dirs,
+        Err(err) => return Err(Box::new(err)),
+    };
+    let path_buf = match dirs.find_config_file("settings.json") {
+        Some(path_buf) => path_buf,
+        None => return Err(Box::new(ConfigFileNotFoundError)),
+    };
+    let path = match path_buf.to_str() {
+        Some(path) => path.to_string(),
+        None => return Err(Box::new(PathToUnicodeError)),
+    };
+    Ok(path)
+}
+
+/// Read the configuration file into a [Settings](struct.Settings.html) object.
+///
+/// An error may be returned for one of two broad categories of reasons:
+///
+/// *   The file couldn't be opened. Maybe a settings file couldn't be found; or maybe a settings
+///     file was found but could not be opened.
+/// *   The file contained invalid contents. See [Settings::new](struct.Settings.html#method.new).
+pub fn load() -> Result<Settings, Box<dyn Error>> {
+    let load_path = get_load_path()?;
+    let handle = match File::open(load_path) {
+        Ok(handle) => handle,
+        Err(err) => return Err(Box::new(err)),
+    };
+    let reader = BufReader::new(handle);
+    let settings = Settings::new(reader)?;
+    Ok(settings)
 }
 
 #[cfg(test)]
