@@ -5,7 +5,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, Read};
 
-use dbus::BusType;
+use dbus::{BusName, BusType};
 use serde::Deserialize;
 use xdg::BaseDirectories;
 
@@ -38,8 +38,47 @@ impl Expression {
 /// `bus_name`.
 #[derive(Clone, Debug)]
 pub struct Notifier {
-    pub bus_name: String,
+    bus_name: String,
     pub bus_type: BusType,
+}
+
+impl Notifier {
+    /// Create a new notifier.
+    ///
+    /// Return an error if any arguments are invalid.
+    ///
+    ///     use dbus::BusType;
+    ///     use killjoy::settings::Notifier;
+    ///
+    ///     let bus_name = "org.freedesktop.Notifications";
+    ///     let bus_type = BusType::Session;
+    ///     Notifier::new(bus_name, bus_type).unwrap();
+    ///
+    ///     let bus_name = "org/freedesktop/Notifications";
+    ///     match Notifier::new(bus_name, bus_type) {
+    ///         Ok(_) => panic!("bus_name should have been invalid"),
+    ///         Err(_) => { }
+    ///     }
+    ///
+    pub fn new(bus_name: &str, bus_type: BusType) -> Result<Self, Box<dyn Error>> {
+        let new_obj = Self {
+            bus_name: bus_name.to_owned(),
+            bus_type: bus_type,
+        };
+        new_obj.maybe_get_bus_name()?;
+        Ok(new_obj)
+    }
+
+    /// Get the `bus_name` attribute.
+    pub fn get_bus_name<'bn>(&'bn self) -> BusName<'bn> {
+        self.maybe_get_bus_name().expect(
+            "bus_name is invalid. new() should have caught this. Please contact a developer.",
+        )
+    }
+
+    fn maybe_get_bus_name<'bn>(&'bn self) -> Result<BusName<'bn>, Box<dyn Error>> {
+        Ok(BusName::new(&self.bus_name[..])?)
+    }
 }
 
 /// Units to watch, and notifiers to contact when any of them enter a state of interest.
@@ -122,10 +161,10 @@ struct SerdeNotifier {
 impl SerdeNotifier {
     // See SerdeSettings.
     fn to_notifier(&self) -> Result<Notifier, Box<dyn Error>> {
-        Ok(Notifier {
-            bus_name: self.bus_name.to_owned(),
-            bus_type: decode_bus_type_str(&self.bus_type)?,
-        })
+        Ok(Notifier::new(
+            &self.bus_name,
+            decode_bus_type_str(&self.bus_type)?,
+        )?)
     }
 }
 
