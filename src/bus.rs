@@ -450,7 +450,7 @@ pub fn decode_active_state_str(active_state_str: &str) -> Result<ActiveState, St
 fn get_rules_matching_name<'a>(rules: &[&'a Rule], unit_name: &str) -> Vec<&'a Rule> {
     rules
         .iter()
-        .map(|rule: &&Rule| *rule)
+        .cloned() // &&Rule → &Rule
         .filter(|rule: &&Rule| rule.expression.matches(unit_name))
         .collect()
 }
@@ -459,7 +459,7 @@ fn get_rules_matching_name<'a>(rules: &[&'a Rule], unit_name: &str) -> Vec<&'a R
 fn get_rules_matching_active_state<'a>(rules: &[&'a Rule], target: ActiveState) -> Vec<&'a Rule> {
     rules
         .iter()
-        .map(|rule: &&Rule| *rule)
+        .cloned() // &&Rule → &Rule
         .filter(|rule: &&Rule| {
             rule.active_states
                 .iter()
