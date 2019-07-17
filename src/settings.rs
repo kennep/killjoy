@@ -260,14 +260,14 @@ impl TryFrom<SerdeSettings> for Settings {
 }
 
 // See SerdeSettings.
-#[derive(Clone, Deserialize)]
+#[derive(Deserialize)]
 struct SerdeNotifier {
     bus_name: String,
     bus_type: String,
 }
 
 // See SerdeSettings.
-#[derive(Clone, Deserialize)]
+#[derive(Deserialize)]
 struct SerdeRule {
     active_states: Vec<String>,
     bus_type: String,
@@ -292,7 +292,7 @@ struct SerdeRule {
 // Calling SerdeSettings::to_settings forces values to be cast to more appropriate types. Although
 // type-casting doesn't guarantee that a settings object contains valid values, it gets closer to
 // the ideal.
-#[derive(Clone, Deserialize)]
+#[derive(Deserialize)]
 struct SerdeSettings {
     notifiers: HashMap<String, SerdeNotifier>,
     rules: Vec<SerdeRule>,
