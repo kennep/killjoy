@@ -1,6 +1,7 @@
 //! Logic for dealing with settings files.
 
 use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -116,6 +117,15 @@ impl Notifier {
     }
 }
 
+impl TryFrom<SerdeNotifier> for Notifier {
+    type Error = Box<dyn Error>;
+
+    fn try_from(value: SerdeNotifier) -> Result<Self, Self::Error> {
+        let notifier = Notifier::new(&value.bus_name, decode_bus_type_str(&value.bus_type)?)?;
+        Ok(notifier)
+    }
+}
+
 /// Units to watch, and notifiers to contact when any of them enter a state of interest.
 ///
 /// Upon startup, killjoy will connect to `bus_type`. It will watch all units whose name matches
@@ -127,6 +137,39 @@ pub struct Rule {
     pub bus_type: BusType,
     pub expression: Expression,
     pub notifiers: Vec<String>,
+}
+
+impl TryFrom<SerdeRule> for Rule {
+    type Error = Box<dyn Error>;
+
+    fn try_from(value: SerdeRule) -> Result<Self, Self::Error> {
+        let mut active_states: HashSet<ActiveState> = HashSet::new();
+        for active_state_string in &value.active_states {
+            let active_state = bus::decode_active_state_str(&active_state_string[..])?;
+            active_states.insert(active_state);
+        }
+
+        let bus_type = decode_bus_type_str(&value.bus_type)?;
+
+        let expression: Expression = match &value.expression_type[..] {
+            "regex" => Expression::Regex(regex::Regex::new(&value.expression[..])?),
+            "unit name" => Expression::UnitName(value.expression.to_owned()),
+            "unit type" => Expression::UnitType(value.expression.to_owned()),
+            other => {
+                let msg = format!("Found unknown expression type: {}", other);
+                return Err(Box::new(ConfigFileDecodeError { msg }));
+            }
+        };
+
+        let notifiers = value.notifiers.to_owned();
+
+        Ok(Rule {
+            active_states,
+            bus_type,
+            expression,
+            notifiers,
+        })
+    }
 }
 
 /// A deserialized copy of a configuration file.
@@ -181,8 +224,38 @@ impl Settings {
     ///     set to a value such as `"foo"`, or so on.
     pub fn new<T: Read>(reader: T) -> Result<Self, Box<dyn Error>> {
         let serde_settings: SerdeSettings = serde_json::from_reader(reader)?;
-        let settings: Self = serde_settings.to_settings()?;
+        let settings = Self::try_from(serde_settings)?;
         Ok(settings)
+    }
+}
+
+impl TryFrom<SerdeSettings> for Settings {
+    type Error = Box<dyn Error>;
+
+    fn try_from(value: SerdeSettings) -> Result<Self, Self::Error> {
+        // Use for loops instead of chaining method calls on iter() so that the ? operator may be
+        // used.
+        let mut notifiers: HashMap<String, Notifier> = HashMap::new();
+        for (key, serde_notifier) in value.notifiers.into_iter() {
+            let notifier = Notifier::try_from(serde_notifier)?;
+            notifiers.insert(key, notifier);
+        }
+        let notifiers = notifiers; // make immutable
+
+        let mut rules: Vec<Rule> = Vec::new();
+        for serde_rule in value.rules.into_iter() {
+            let rule = Rule::try_from(serde_rule)?;
+            for notifier in &rule.notifiers {
+                if !notifiers.contains_key(notifier) {
+                    let msg = format!("Rule references non-existent notifier: {}", notifier);
+                    return Err(Box::new(ConfigFileDecodeError { msg }));
+                }
+            }
+            rules.push(rule);
+        }
+        let rules = rules; // make immutable
+
+        Ok(Self { notifiers, rules })
     }
 }
 
@@ -193,16 +266,6 @@ struct SerdeNotifier {
     bus_type: String,
 }
 
-impl SerdeNotifier {
-    // See SerdeSettings.
-    fn to_notifier(&self) -> Result<Notifier, Box<dyn Error>> {
-        Ok(Notifier::new(
-            &self.bus_name,
-            decode_bus_type_str(&self.bus_type)?,
-        )?)
-    }
-}
-
 // See SerdeSettings.
 #[derive(Clone, Deserialize)]
 struct SerdeRule {
@@ -211,38 +274,6 @@ struct SerdeRule {
     expression: String,
     expression_type: String,
     notifiers: Vec<String>,
-}
-
-impl SerdeRule {
-    // See SerdeSettings.
-    fn to_rule(&self) -> Result<Rule, Box<dyn Error>> {
-        let mut active_states: HashSet<ActiveState> = HashSet::new();
-        for active_state_string in &self.active_states {
-            let active_state = bus::decode_active_state_str(&active_state_string[..])?;
-            active_states.insert(active_state);
-        }
-
-        let bus_type = decode_bus_type_str(&self.bus_type)?;
-
-        let expression: Expression = match &self.expression_type[..] {
-            "regex" => Expression::Regex(regex::Regex::new(&self.expression[..])?),
-            "unit name" => Expression::UnitName(self.expression.to_owned()),
-            "unit type" => Expression::UnitType(self.expression.to_owned()),
-            other => {
-                let msg = format!("Found unknown expression type: {}", other);
-                return Err(Box::new(ConfigFileDecodeError { msg }));
-            }
-        };
-
-        let notifiers = self.notifiers.to_owned();
-
-        Ok(Rule {
-            active_states,
-            bus_type,
-            expression,
-            notifiers,
-        })
-    }
 }
 
 // Like a `Settings`, but fields are simple types instead of domain-specific types.
@@ -265,34 +296,6 @@ impl SerdeRule {
 struct SerdeSettings {
     notifiers: HashMap<String, SerdeNotifier>,
     rules: Vec<SerdeRule>,
-}
-
-impl SerdeSettings {
-    // See SerdeSettings.
-    fn to_settings(&self) -> Result<Settings, Box<dyn Error>> {
-        // Use for loops instead of chaining method calls on iter() so that the ? operator may be
-        // used.
-        let mut notifiers: HashMap<String, Notifier> = HashMap::new();
-        for (key, val) in self.notifiers.iter() {
-            let new_key = key.to_owned();
-            let new_val = val.to_notifier()?;
-            notifiers.insert(new_key, new_val);
-        }
-
-        let mut rules: Vec<Rule> = Vec::new();
-        for rule in self.rules.iter() {
-            let new_rule = rule.to_rule()?;
-            for notifier in &new_rule.notifiers {
-                if !notifiers.contains_key(notifier) {
-                    let msg = format!("Rule references non-existent notifier: {}", notifier);
-                    return Err(Box::new(ConfigFileDecodeError { msg }));
-                }
-            }
-            rules.push(new_rule);
-        }
-
-        Ok(Settings { notifiers, rules })
-    }
 }
 
 pub fn decode_bus_type_str(bus_type_str: &str) -> Result<BusType, String> {
