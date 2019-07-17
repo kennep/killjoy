@@ -229,9 +229,8 @@ impl SerdeRule {
             "unit name" => Expression::UnitName(self.expression.to_owned()),
             "unit type" => Expression::UnitType(self.expression.to_owned()),
             other => {
-                return Err(Box::new(ConfigFileDecodeError {
-                    text: other.to_owned(),
-                }))
+                let msg = format!("Found unknown expression type: {}", other);
+                return Err(Box::new(ConfigFileDecodeError { msg }));
             }
         };
 
