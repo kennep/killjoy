@@ -173,7 +173,7 @@ impl BusWatcher {
             let active_state = usm.get_active_state();
             let matching_rules: Vec<&Rule> = self.settings.rules.iter().collect();
             let matching_rules = get_rules_matching_name(&matching_rules, &unit_name);
-            let matching_rules = get_rules_matching_active_state(&matching_rules, &active_state);
+            let matching_rules = get_rules_matching_active_state(&matching_rules, active_state);
             println!(
                 "{} state machine changed to {:?}. Matching rules: {:?}",
                 unit_name, active_state, matching_rules
@@ -270,7 +270,7 @@ impl BusWatcher {
         // Get the timestamp at which that state was last entered. If ActiveState changed, then we
         // assume that the corresponding timestamp must be present.
         let msg_path: Path = msg.path().expect("Failed to get path from signal headers.");
-        let timestamp_key = get_timestamp_key(&active_state);
+        let timestamp_key = get_timestamp_key(active_state);
         let timestamp: u64 = match msg_body.changed_properties.get(timestamp_key) {
             Some(timestamp_variant) => timestamp_variant.0.as_u64().unwrap(),
             None => panic!(format!(
@@ -333,7 +333,7 @@ impl BusWatcher {
         let active_state = decode_active_state_str(active_state_str).unwrap();
 
         // Get timestamp at which that state was last entered.
-        let timestamp_key = get_timestamp_key(&active_state);
+        let timestamp_key = get_timestamp_key(active_state);
         let timestamp = unit_props.get(timestamp_key).unwrap().0.as_u64().unwrap();
 
         // Update unit state machine.
@@ -456,20 +456,20 @@ fn get_rules_matching_name<'a>(rules: &[&'a Rule], unit_name: &str) -> Vec<&'a R
 }
 
 // Tell which rules match the given unit state.
-fn get_rules_matching_active_state<'a>(rules: &[&'a Rule], target: &ActiveState) -> Vec<&'a Rule> {
+fn get_rules_matching_active_state<'a>(rules: &[&'a Rule], target: ActiveState) -> Vec<&'a Rule> {
     rules
         .iter()
         .map(|rule: &&Rule| *rule)
         .filter(|rule: &&Rule| {
             rule.active_states
                 .iter()
-                .any(|active_state| active_state == target)
+                .any(|active_state| *active_state == target)
         })
         .collect()
 }
 
 // Return the D-Bus property indicating when the given state was most recently entered.
-fn get_timestamp_key(active_state: &ActiveState) -> &'static str {
+fn get_timestamp_key(active_state: ActiveState) -> &'static str {
     match active_state {
         ActiveState::Activating => "InactiveExitTimestampMonotonic",
         ActiveState::Active => "ActiveEnterTimestampMonotonic",
@@ -560,7 +560,7 @@ mod tests {
 
         let active_state = ActiveState::Inactive;
 
-        let matching_rules = get_rules_matching_active_state(&borrowed_rules, &active_state);
+        let matching_rules = get_rules_matching_active_state(&borrowed_rules, active_state);
         assert_eq!(matching_rules.len(), 0);
     }
 
@@ -575,7 +575,7 @@ mod tests {
 
         let active_state = ActiveState::Activating;
 
-        let matching_rules = get_rules_matching_active_state(&borrowed_rules, &active_state);
+        let matching_rules = get_rules_matching_active_state(&borrowed_rules, active_state);
         assert_eq!(matching_rules.len(), 1);
     }
 
@@ -589,7 +589,7 @@ mod tests {
         let borrowed_rules: Vec<&Rule> = rules.iter().collect();
         let active_state = ActiveState::Active;
 
-        let matching_rules = get_rules_matching_active_state(&borrowed_rules, &active_state);
+        let matching_rules = get_rules_matching_active_state(&borrowed_rules, active_state);
         assert_eq!(matching_rules.len(), 2);
     }
 

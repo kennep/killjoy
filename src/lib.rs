@@ -24,7 +24,7 @@ fn get_bus_types(rules: &[Rule]) -> Vec<BusType> {
     // create a HashSet<BusType>.
     rules
         .iter()
-        .map(|rule: &Rule| settings::encode_bus_type(&rule.bus_type))
+        .map(|rule: &Rule| settings::encode_bus_type(rule.bus_type))
         .collect::<HashSet<String>>()
         .into_iter()
         .map(|bus_type_str: String| settings::decode_bus_type_str(&bus_type_str[..]).unwrap())

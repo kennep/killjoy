@@ -105,7 +105,7 @@ impl Notifier {
     }
 
     /// Get the `bus_name` attribute.
-    pub fn get_bus_name<'bn>(&'bn self) -> BusName<'bn> {
+    pub fn get_bus_name(&self) -> BusName {
         self.maybe_get_bus_name().expect(
             "bus_name is invalid. new() should have caught this. Please contact a developer.",
         )
@@ -307,7 +307,7 @@ pub fn decode_bus_type_str(bus_type_str: &str) -> Result<BusType, String> {
     }
 }
 
-pub fn encode_bus_type(bus_type: &BusType) -> String {
+pub fn encode_bus_type(bus_type: BusType) -> String {
     match bus_type {
         BusType::Session => "session".to_string(),
         BusType::Starter => "starter".to_string(),

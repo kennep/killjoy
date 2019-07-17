@@ -56,8 +56,8 @@ impl UnitStateMachine {
         }
     }
 
-    pub fn get_active_state(&self) -> &ActiveState {
-        &self.active_state
+    pub fn get_active_state(&self) -> ActiveState {
+        self.active_state
     }
 }
 
