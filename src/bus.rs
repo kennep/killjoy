@@ -14,9 +14,9 @@ use crate::settings::{Rule, Settings};
 use crate::unit::{ActiveState, UnitStateMachine};
 use crate::VERBOSE;
 
-const BUS_NAME_FOR_SYSTEMD: &'static str = "org.freedesktop.systemd1";
-const PATH_FOR_SYSTEMD: &'static str = "/org/freedesktop/systemd1";
-const INTERFACE_FOR_SYSTEMD_UNIT: &'static str = "org.freedesktop.systemd1.Unit";
+const BUS_NAME_FOR_SYSTEMD: &str = "org.freedesktop.systemd1";
+const PATH_FOR_SYSTEMD: &str = "/org/freedesktop/systemd1";
+const INTERFACE_FOR_SYSTEMD_UNIT: &str = "org.freedesktop.systemd1.Unit";
 
 // Watch units appear and disappear on a bus, and take actions in response.
 pub struct BusWatcher {
@@ -191,10 +191,10 @@ impl BusWatcher {
         let path = path.to_owned();
         let timeout = 1000; // milliseconds
         dbus::ConnPath {
-            conn: conn,
+            conn,
             dest: bus_name,
-            path: path,
-            timeout: timeout,
+            path,
+            timeout,
         }
     }
 
@@ -252,7 +252,7 @@ impl BusWatcher {
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) {
         // The properties we're interested in are exposed on org.freedesktop.systemd1.Unit.
-        if &msg_body.interface != INTERFACE_FOR_SYSTEMD_UNIT {
+        if msg_body.interface != INTERFACE_FOR_SYSTEMD_UNIT {
             return;
         }
 
@@ -301,7 +301,7 @@ impl BusWatcher {
         unit_states
             .entry(unit_name.clone())
             .and_modify(|usm| usm.update(active_state, timestamp, &on_change))
-            .or_insert(UnitStateMachine::new(active_state, timestamp, &on_change));
+            .or_insert_with(|| UnitStateMachine::new(active_state, timestamp, &on_change));
     }
 
     // Get the given unit's state, and update `unit_states` as appropriate.
@@ -341,7 +341,7 @@ impl BusWatcher {
         unit_states
             .entry(unit_name.to_string())
             .and_modify(|usm| usm.update(active_state, timestamp, &on_change))
-            .or_insert(UnitStateMachine::new(active_state, timestamp, &on_change));
+            .or_insert_with(|| UnitStateMachine::new(active_state, timestamp, &on_change));
 
         Ok(())
     }
@@ -447,7 +447,7 @@ pub fn decode_active_state_str(active_state_str: &str) -> Result<ActiveState, St
 }
 
 // Tell which rules match the given unit name.
-fn get_rules_matching_name<'a>(rules: &Vec<&'a Rule>, unit_name: &str) -> Vec<&'a Rule> {
+fn get_rules_matching_name<'a>(rules: &[&'a Rule], unit_name: &str) -> Vec<&'a Rule> {
     rules
         .iter()
         .map(|rule: &&Rule| *rule)
@@ -456,10 +456,7 @@ fn get_rules_matching_name<'a>(rules: &Vec<&'a Rule>, unit_name: &str) -> Vec<&'
 }
 
 // Tell which rules match the given unit state.
-fn get_rules_matching_active_state<'a>(
-    rules: &Vec<&'a Rule>,
-    target: &ActiveState,
-) -> Vec<&'a Rule> {
+fn get_rules_matching_active_state<'a>(rules: &[&'a Rule], target: &ActiveState) -> Vec<&'a Rule> {
     rules
         .iter()
         .map(|rule: &&Rule| *rule)
@@ -483,8 +480,8 @@ fn get_timestamp_key(active_state: &ActiveState) -> &'static str {
 }
 
 // Tell whether at least one rule matches the given unit name.
-fn rules_match_name(rules: &Vec<&Rule>, unit_name: &str) -> bool {
-    get_rules_matching_name(rules, unit_name).len() > 0
+fn rules_match_name(rules: &[&Rule], unit_name: &str) -> bool {
+    !get_rules_matching_name(rules, unit_name).is_empty()
 }
 
 // Wrap BUS_NAME_FOR_SYSTEMD.

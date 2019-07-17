@@ -98,7 +98,7 @@ impl Notifier {
     pub fn new(bus_name: &str, bus_type: BusType) -> Result<Self, Box<dyn Error>> {
         let new_obj = Self {
             bus_name: bus_name.to_owned(),
-            bus_type: bus_type,
+            bus_type,
         };
         new_obj.maybe_get_bus_name()?;
         Ok(new_obj)

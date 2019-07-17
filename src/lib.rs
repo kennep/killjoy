@@ -18,7 +18,7 @@ use settings::{Rule, Settings};
 const VERBOSE: bool = false;
 
 // Get a deduplicated list of D-Bus bus types in the given list of rules.
-fn get_bus_types(rules: &Vec<Rule>) -> Vec<BusType> {
+fn get_bus_types(rules: &[Rule]) -> Vec<BusType> {
     // The conversion from BusType → String → BusType is a hack. It's done because this method
     // should deduplicate BusType values, but BusType doesn't implement the traits necessary to
     // create a HashSet<BusType>.
