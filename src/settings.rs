@@ -271,7 +271,7 @@ struct SerdeSettings {
 impl SerdeSettings {
     // See SerdeSettings.
     fn to_settings(&self) -> Result<Settings, Box<dyn Error>> {
-        // Use :or loops instead of chaining method calls on iter() so that the ? operator may be
+        // Use for loops instead of chaining method calls on iter() so that the ? operator may be
         // used.
         let mut notifiers: HashMap<String, Notifier> = HashMap::new();
         for (key, val) in self.notifiers.iter() {
