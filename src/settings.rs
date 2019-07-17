@@ -282,6 +282,12 @@ impl SerdeSettings {
         let mut rules: Vec<Rule> = Vec::new();
         for rule in self.rules.iter() {
             let new_rule = rule.to_rule()?;
+            for notifier in &new_rule.notifiers {
+                if !notifiers.contains_key(notifier) {
+                    let msg = format!("Rule references non-existent notifier: {}", notifier);
+                    return Err(Box::new(ConfigFileDecodeError { msg }));
+                }
+            }
             rules.push(new_rule);
         }
 
