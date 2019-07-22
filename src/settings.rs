@@ -25,19 +25,8 @@ pub enum Expression {
 impl Expression {
     /// Check whether this expression matches the given `unit_name`.
     ///
-    /// Regex expressions match using a regex:
-    ///
-    ///     use killjoy::settings::Expression;
-    ///     use regex::Regex;
-    ///
-    ///     let unit_name = "aaa.service";
-    ///     let expression = Expression::Regex(Regex::new(r"a\.ser").unwrap());
-    ///     assert!(expression.matches(&unit_name));
-    ///
-    ///     let expression = Expression::Regex(Regex::new(r"b\.ser").unwrap());
-    ///     assert!(!expression.matches(&unit_name));
-    ///
-    /// UnitName expressions match against the entire `unit_name`:
+    /// A `UnitName` expression matches unit names (typically discovered via systemd) against a unit
+    /// name:
     ///
     ///     use killjoy::settings::Expression;
     ///
@@ -48,7 +37,7 @@ impl Expression {
     ///     let expression = Expression::UnitName(".service".to_string());
     ///     assert!(!expression.matches(&unit_name));
     ///
-    /// UnitType expressions match against the `unit_type` suffix:
+    /// A `UnitType` expression matches unit names against a unit type:
     ///
     ///     use killjoy::settings::Expression;
     ///
@@ -59,6 +48,17 @@ impl Expression {
     ///     let expression = Expression::UnitType(".mount".to_string());
     ///     assert!(!expression.matches(&unit_name));
     ///
+    /// A `Regex` expression matches unit names against a regular expression:
+    ///
+    ///     use killjoy::settings::Expression;
+    ///     use regex::Regex;
+    ///
+    ///     let expression = Expression::Regex(Regex::new(r"a\.service").unwrap());
+    ///     assert!(!expression.matches(".service"));
+    ///     assert!(expression.matches("a.service"));
+    ///     assert!(expression.matches("aa.service"));
+    ///
+    /// Regular expressions are implemented with the [regex](https://docs.rs/regex/) crate.
     pub fn matches(&self, unit_name: &str) -> bool {
         match &self {
             Expression::Regex(expr) => expr.is_match(unit_name),
