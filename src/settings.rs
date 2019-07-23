@@ -58,7 +58,9 @@ impl Expression {
     ///     assert!(expression.matches("a.service"));
     ///     assert!(expression.matches("aa.service"));
     ///
-    /// Regular expressions are implemented with the [regex](https://docs.rs/regex/) crate.
+    /// Regular expressions are implemented with the [regex] crate.
+    ///
+    /// [regex]: https://docs.rs/regex/
     pub fn matches(&self, unit_name: &str) -> bool {
         match &self {
             Expression::Regex(expr) => expr.is_match(unit_name),
@@ -214,14 +216,16 @@ pub struct Settings {
 impl Settings {
     /// Create a new settings object.
     ///
-    /// For a usage example, see [Settings](struct.Settings.html). An error may be returned for one
-    /// of two broad categories of reasons:
+    /// For a usage example, see [`Settings`]. An error may be returned for one of two broad
+    /// categories of reasons:
     ///
     /// *   Deserialization of the `reader` failed. Maybe the reader yielded non-unicode bytes;
     ///     maybe the bytes were valid unicode but not valid JSON; maybe the unicode was valid JSON
     ///     but didn't match the settings file schema; or so on.
     /// *   The settings object contained semantically invalid data. Maybe a `"bus_type"` key was
     ///     set to a value such as `"foo"`, or so on.
+    ///
+    /// [`Settings`]: struct.Settings.html
     pub fn new<T: Read>(reader: T) -> Result<Self, Box<dyn Error>> {
         let serde_settings: SerdeSettings = serde_json::from_reader(reader)?;
         let settings = Self::try_from(serde_settings)?;
@@ -337,13 +341,15 @@ pub fn get_load_path() -> Result<String, Box<dyn Error>> {
     Ok(path)
 }
 
-/// Read the configuration file into a [Settings](struct.Settings.html) object.
+/// Read the configuration file into a [`Settings`] object.
 ///
 /// An error may be returned for one of two broad categories of reasons:
 ///
 /// *   The file couldn't be opened. Maybe a settings file couldn't be found; or maybe a settings
 ///     file was found but could not be opened.
 /// *   The file contained invalid contents. See [Settings::new](struct.Settings.html#method.new).
+///
+/// [`Settings`]: struct.Settings.html
 pub fn load() -> Result<Settings, Box<dyn Error>> {
     let load_path = get_load_path()?;
     let handle = match File::open(load_path) {
