@@ -1,19 +1,19 @@
 //! Custom exceptions.
 
 use std::error::Error;
-use std::fmt;
+use std::fmt::{Display, Formatter, Result as FmtResult};
 
 /// An error indicating that finding a configuration file failed.
 #[derive(Debug)]
 pub struct FindConfigFileError;
 
-impl Error for FindConfigFileError {}
-
-impl fmt::Display for FindConfigFileError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for FindConfigFileError {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "No configuration file found.")
     }
 }
+
+impl Error for FindConfigFileError {}
 
 /// An error indicating that parsing a configuration file failed.
 #[derive(Debug)]
@@ -21,13 +21,13 @@ pub struct ParseConfigFileError {
     pub msg: String,
 }
 
-impl Error for ParseConfigFileError {}
-
-impl fmt::Display for ParseConfigFileError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for ParseConfigFileError {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "{}", &self.msg[..])
     }
 }
+
+impl Error for ParseConfigFileError {}
 
 /// An error indicating that a file path could not be parsed.
 ///
@@ -35,10 +35,10 @@ impl fmt::Display for ParseConfigFileError {
 #[derive(Debug)]
 pub struct ParsePathError;
 
-impl Error for ParsePathError {}
-
-impl fmt::Display for ParsePathError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for ParsePathError {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "Failed to convert file path to a unicode string.")
     }
 }
+
+impl Error for ParsePathError {}
