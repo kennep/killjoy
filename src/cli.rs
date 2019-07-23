@@ -3,6 +3,7 @@
 use std::cmp;
 
 use clap::{App, AppSettings, ArgMatches, SubCommand};
+use clap;
 use regex::Regex;
 use textwrap::{HyphenSplitter, Wrapper};
 
@@ -10,7 +11,7 @@ use textwrap::{HyphenSplitter, Wrapper};
 pub fn get_cli_args<'a>() -> ArgMatches<'a> {
     let help_messages = HelpMessagesFactory::new().gen_help_messages();
     App::new("killjoy")
-        .version("0.0.1")
+        .version(clap::crate_version!())
         .author("Jeremy Audet <jerebear@protonmail.com>")
         .about("Monitor systemd units.")
         .subcommand(
