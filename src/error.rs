@@ -3,39 +3,41 @@
 use std::error::Error;
 use std::fmt;
 
-/// An error indicating that a configuration file could not be found.
+/// An error indicating that finding a configuration file failed.
 #[derive(Debug)]
-pub struct ConfigFileNotFoundError;
+pub struct FindConfigFileError;
 
-impl Error for ConfigFileNotFoundError {}
+impl Error for FindConfigFileError {}
 
-impl fmt::Display for ConfigFileNotFoundError {
+impl fmt::Display for FindConfigFileError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "No configuration file found.")
     }
 }
 
-/// An error indicating that a configuration file could not be decoded.
+/// An error indicating that parsing a configuration file failed.
 #[derive(Debug)]
-pub struct ConfigFileDecodeError {
+pub struct ParseConfigFileError {
     pub msg: String,
 }
 
-impl Error for ConfigFileDecodeError {}
+impl Error for ParseConfigFileError {}
 
-impl fmt::Display for ConfigFileDecodeError {
+impl fmt::Display for ParseConfigFileError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", &self.msg[..])
     }
 }
 
-/// An error indicating that a file path could not be converted to a unicode string.
+/// An error indicating that a file path could not be parsed.
+///
+/// OS file paths are most commonly parsed as unicode.
 #[derive(Debug)]
-pub struct PathToUnicodeError;
+pub struct ParsePathError;
 
-impl Error for PathToUnicodeError {}
+impl Error for ParsePathError {}
 
-impl fmt::Display for PathToUnicodeError {
+impl fmt::Display for ParsePathError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Failed to convert file path to a unicode string.")
     }

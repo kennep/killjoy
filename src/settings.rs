@@ -11,7 +11,7 @@ use serde::Deserialize;
 use xdg::BaseDirectories;
 
 use crate::bus;
-use crate::error::{ConfigFileDecodeError, ConfigFileNotFoundError, PathToUnicodeError};
+use crate::error::{FindConfigFileError, ParseConfigFileError, ParsePathError};
 use crate::unit::ActiveState;
 
 /// The expressions that a user may use to match unit names.
@@ -157,7 +157,7 @@ impl TryFrom<SerdeRule> for Rule {
             "unit type" => Expression::UnitType(value.expression.to_owned()),
             other => {
                 let msg = format!("Found unknown expression type: {}", other);
-                return Err(Box::new(ConfigFileDecodeError { msg }));
+                return Err(Box::new(ParseConfigFileError { msg }));
             }
         };
 
@@ -248,7 +248,7 @@ impl TryFrom<SerdeSettings> for Settings {
             for notifier in &rule.notifiers {
                 if !notifiers.contains_key(notifier) {
                     let msg = format!("Rule references non-existent notifier: {}", notifier);
-                    return Err(Box::new(ConfigFileDecodeError { msg }));
+                    return Err(Box::new(ParseConfigFileError { msg }));
                 }
             }
             rules.push(rule);
@@ -328,11 +328,11 @@ pub fn get_load_path() -> Result<String, Box<dyn Error>> {
     };
     let path_buf = match dirs.find_config_file("settings.json") {
         Some(path_buf) => path_buf,
-        None => return Err(Box::new(ConfigFileNotFoundError)),
+        None => return Err(Box::new(FindConfigFileError)),
     };
     let path = match path_buf.to_str() {
         Some(path) => path.to_string(),
-        None => return Err(Box::new(PathToUnicodeError)),
+        None => return Err(Box::new(ParsePathError)),
     };
     Ok(path)
 }
