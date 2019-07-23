@@ -1,4 +1,4 @@
-//! Logic for interacting with D-Bus buses.
+// Logic for interacting with D-Bus buses.
 
 use std::collections::HashMap;
 
@@ -429,9 +429,9 @@ impl BusWatcher {
     }
 }
 
-/// Return the ActiveState enum entry corresponding to the given string.
-///
-/// Return an error if the given string doesn't correspond to any enum entries.
+// Return the ActiveState enum entry corresponding to the given string.
+//
+// Return an error if the given string doesn't correspond to any enum entries.
 pub fn decode_active_state_str(active_state_str: &str) -> Result<ActiveState, String> {
     match active_state_str {
         "activating" => Ok(ActiveState::Activating),

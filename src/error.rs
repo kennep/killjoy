@@ -1,9 +1,9 @@
-//! Custom exceptions.
+// Custom exceptions.
 
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
-/// An error indicating that finding a configuration file failed.
+// An error indicating that finding a configuration file failed.
 #[derive(Debug)]
 pub struct FindConfigFileError;
 
@@ -15,7 +15,7 @@ impl Display for FindConfigFileError {
 
 impl Error for FindConfigFileError {}
 
-/// An error indicating that parsing a configuration file failed.
+// An error indicating that parsing a configuration file failed.
 #[derive(Debug)]
 pub struct ParseConfigFileError {
     pub msg: String,
@@ -29,9 +29,9 @@ impl Display for ParseConfigFileError {
 
 impl Error for ParseConfigFileError {}
 
-/// An error indicating that a file path could not be parsed.
-///
-/// OS file paths are most commonly parsed as unicode.
+// An error indicating that a file path could not be parsed.
+//
+// OS file paths are most commonly parsed as unicode.
 #[derive(Debug)]
 pub struct ParsePathError;
 

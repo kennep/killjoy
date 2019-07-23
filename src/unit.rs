@@ -1,4 +1,4 @@
-//! Logic for representing units.
+// Logic for representing units.
 
 // The possible values for a unit's `ActiveState` attribute.
 //
