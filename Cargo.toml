@@ -1,8 +1,16 @@
+# See: https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [package]
-name = "killjoy"
-version = "0.1.0"
 authors = ["Jeremy Audet <jerebear@protonmail.com>"]
+categories = ["command-line-utilities"]
+description = "Monitor systemd units."
 edition = "2018"
+keywords = ["d-bus", "dbus", "systemd", "unit"]
+license = "GPL-3.0-or-later"
+name = "killjoy"
+readme = "README.md"
+repository = "https://github.com/Ichimonji10/killjoy"
+version = "0.1.0"
 
 [dependencies]
 clap = "2"
