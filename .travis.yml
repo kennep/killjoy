@@ -1,0 +1,41 @@
+language: rust
+
+# Test against all three channels of Rust. In the spirit of the Rust community
+# it's appreciated if tested against all three channels.
+rust:
+    - stable
+    - beta
+    - nightly
+
+# It's okay for nightly to fail
+matrix:
+    allow_failures:
+        - rust: nightly
+
+# Install necessary system packages
+addons:
+    apt:
+        packages:
+            - libdbus-1-dev
+
+# Cache the dependencies so they are only recompiled if they or the compiler were upgradeed
+# This adds the following directories to the cache
+# $TRAVIS_HOME/.cache/sccache
+# $TRAVIS_HOME/.cargo/
+# $TRAV_SHOME/.rustup/
+# target
+cache: cargo
+
+# Install clippy and fmt so they're available for the script
+before_script:
+    - rustup component add clippy-preview
+    - rustup component add rustfmt
+
+# Be thorough, test everything available
+script:
+    - cargo check
+    - cargo test
+    - cargo clippy
+    - cargo fmt
+    - cargo doc
+
