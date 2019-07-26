@@ -2,8 +2,8 @@
 
 use std::cmp;
 
-use clap::{App, AppSettings, ArgMatches, SubCommand};
 use clap;
+use clap::{App, AppSettings, ArgMatches, SubCommand};
 use regex::Regex;
 use textwrap::{HyphenSplitter, Wrapper};
 
