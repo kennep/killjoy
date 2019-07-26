@@ -24,7 +24,7 @@ cache: cargo
 
 # Install clippy and fmt so they're available for the script
 before_script:
-    - rustup component add clippy-preview
+    - rustup component add clippy
     - rustup component add rustfmt
 
 # Be thorough, test everything available
