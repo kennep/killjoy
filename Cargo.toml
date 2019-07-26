@@ -22,4 +22,4 @@ textwrap = {version="0", features = ["term_size"]}
 xdg = "2"
 
 [badges]
-travis-ci = {repository = "...", branch = "master"}
+travis-ci = {repository = "Ichimonji10/killjoy"}

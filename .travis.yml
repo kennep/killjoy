@@ -18,12 +18,8 @@ addons:
         packages:
             - libdbus-1-dev
 
-# Cache the dependencies so they are only recompiled if they or the compiler were upgradeed
-# This adds the following directories to the cache
-# $TRAVIS_HOME/.cache/sccache
-# $TRAVIS_HOME/.cargo/
-# $TRAV_SHOME/.rustup/
-# target
+# Cache the dependencies so they are only recompiled if they or the compiler were upgraded
+# See https://docs.travis-ci.com/user/languages/rust/#dependency-management for more info.
 cache: cargo
 
 # Install clippy and fmt so they're available for the script
@@ -36,6 +32,4 @@ script:
     - cargo check
     - cargo test
     - cargo clippy
-    - cargo fmt
-    - cargo doc
-
+    - cargo fmt && git diff --exit-code
