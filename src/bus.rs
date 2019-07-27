@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use dbus::arg::Variant;
-use dbus::{BusName, Path, SignalArgs};
+use dbus::{BusName, BusType, ConnPath, Connection, Error, Message, Path, SignalArgs};
 
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusProperties;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusPropertiesPropertiesChanged as PropertiesChanged;
@@ -20,7 +20,7 @@ const INTERFACE_FOR_SYSTEMD_UNIT: &str = "org.freedesktop.systemd1.Unit";
 
 // Watch units appear and disappear on a bus, and take actions in response.
 pub struct BusWatcher {
-    connection: dbus::Connection,
+    connection: Connection,
     settings: Settings,
 }
 
@@ -29,8 +29,8 @@ impl BusWatcher {
     //
     // To watch for units of interest, and to take action when those units of interest transition to
     // states of interest, call `run`.
-    pub fn new(bus_type: dbus::BusType, settings: Settings) -> Self {
-        let connection = dbus::Connection::get_private(bus_type)
+    pub fn new(bus_type: BusType, settings: Settings) -> Self {
+        let connection = Connection::get_private(bus_type)
             .expect(&format!("Failed to connect to {:?} D-Bus bus.", bus_type)[..]);
         let settings = settings;
         BusWatcher {
@@ -182,15 +182,12 @@ impl BusWatcher {
     }
 
     // Get a `ConnPath` for `org.freedesktop.systemd1` and the given object path.
-    fn get_conn_path<'a: 'b, 'b>(
-        &'a self,
-        path: &'b Path,
-    ) -> dbus::ConnPath<'b, &dbus::Connection> {
+    fn get_conn_path<'a: 'b, 'b>(&'a self, path: &'b Path) -> ConnPath<'b, &Connection> {
         let conn = &self.connection;
         let bus_name = wrap_bus_name_for_systemd();
         let path = path.to_owned();
         let timeout = 1000; // milliseconds
-        dbus::ConnPath {
+        ConnPath {
             conn,
             dest: bus_name,
             path,
@@ -247,7 +244,7 @@ impl BusWatcher {
     // changed. It's a value like org.freedesktop.systemd1.Unit or org.freedesktop.systemd1.Service.
     fn handle_properties_changed(
         &self,
-        msg: &dbus::Message,
+        msg: &Message,
         msg_body: &PropertiesChanged,
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) {
@@ -319,7 +316,7 @@ impl BusWatcher {
         &self,
         unit_name: &str,
         unit_states: &mut HashMap<String, UnitStateMachine>,
-    ) -> Result<(), dbus::Error> {
+    ) -> Result<(), Error> {
         // Get unit properties.
         let path: Path = self
             .get_conn_path(&wrap_path_for_systemd())
@@ -386,7 +383,7 @@ impl BusWatcher {
     }
 
     // Subscribe to the `PropertiesChanged` signal for the given unit.
-    fn subscribe_properties_changed(&self, unit_name: &str) -> Result<(), dbus::Error> {
+    fn subscribe_properties_changed(&self, unit_name: &str) -> Result<(), Error> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = self
             .get_conn_path(&wrap_path_for_systemd())
@@ -407,7 +404,7 @@ impl BusWatcher {
         }
     }
 
-    fn unsubscribe_properties_changed(&self, unit_name: &str) -> Result<(), dbus::Error> {
+    fn unsubscribe_properties_changed(&self, unit_name: &str) -> Result<(), Error> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = self
             .get_conn_path(&wrap_path_for_systemd())
@@ -497,6 +494,8 @@ fn wrap_path_for_systemd() -> Path<'static> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use dbus::Interface;
 
     use crate::settings::Expression;
     use crate::test_utils;
@@ -605,6 +604,6 @@ mod tests {
 
     #[test]
     fn test_interface_for_systemd_unit() {
-        dbus::Interface::new(INTERFACE_FOR_SYSTEMD_UNIT).unwrap();
+        Interface::new(INTERFACE_FOR_SYSTEMD_UNIT).unwrap();
     }
 }
