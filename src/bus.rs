@@ -170,7 +170,7 @@ impl BusWatcher {
     // Generate callback for use in case a unit state machine changes.
     fn gen_on_change<'a>(&'a self, unit_name: &'a str) -> impl Fn(&UnitStateMachine) + 'a {
         move |usm: &UnitStateMachine| {
-            let active_state = usm.get_active_state();
+            let active_state = usm.active_state();
             let matching_rules: Vec<&Rule> = self.settings.rules.iter().collect();
             let matching_rules = get_rules_matching_name(&matching_rules, &unit_name);
             let matching_rules = get_rules_matching_active_state(&matching_rules, active_state);
