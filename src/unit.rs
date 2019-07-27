@@ -1,5 +1,9 @@
 // Logic for representing units.
 
+use std::convert::TryFrom;
+
+use crate::error::ParseAsActiveStateError;
+
 // The possible values for a unit's `ActiveState` attribute.
 //
 // Systemd's D-Bus API provides units' ActiveState attribute as a string. This enum exists so that
@@ -17,6 +21,35 @@ pub enum ActiveState {
     Deactivating,
     Failed,
     Inactive,
+}
+
+impl TryFrom<&str> for ActiveState {
+    type Error = ParseAsActiveStateError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "activating" => Ok(ActiveState::Activating),
+            "active" => Ok(ActiveState::Active),
+            "deactivating" => Ok(ActiveState::Deactivating),
+            "failed" => Ok(ActiveState::Failed),
+            "inactive" => Ok(ActiveState::Inactive),
+            _ => Err(ParseAsActiveStateError {
+                msg: format!("Failed to parse string as ActiveState: {}", value,),
+            }),
+        }
+    }
+}
+
+impl From<ActiveState> for String {
+    fn from(value: ActiveState) -> String {
+        match value {
+            ActiveState::Activating => "activating".to_string(),
+            ActiveState::Active => "active".to_string(),
+            ActiveState::Deactivating => "deactivating".to_string(),
+            ActiveState::Failed => "failed".to_string(),
+            ActiveState::Inactive => "inactive".to_string(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -102,5 +135,55 @@ mod tests {
         usm.update(ActiveState::Active, 27, &on_change);
         assert_eq!(usm.active_state, ActiveState::Active);
         assert_eq!(usm.timestamp, 27);
+    }
+
+    // Convert "activating" to an ActiveState.
+    #[test]
+    fn test_active_state_from_activating() {
+        let active_state = ActiveState::try_from("activating").unwrap();
+        assert_eq!(active_state, ActiveState::Activating);
+    }
+
+    // Convert "active" to an ActiveState.
+    #[test]
+    fn test_active_state_from_active() {
+        let active_state = ActiveState::try_from("active").unwrap();
+        assert_eq!(active_state, ActiveState::Active);
+    }
+
+    // Convert "deactivating" to an ActiveState.
+    #[test]
+    fn test_active_state_from_deactivating() {
+        let active_state = ActiveState::try_from("deactivating").unwrap();
+        assert_eq!(active_state, ActiveState::Deactivating);
+    }
+
+    // Convert "failed" to an ActiveState.
+    #[test]
+    fn test_active_state_from_failed() {
+        let active_state = ActiveState::try_from("failed").unwrap();
+        assert_eq!(active_state, ActiveState::Failed);
+    }
+
+    // Convert "inactive" to an ActiveState.
+    #[test]
+    fn test_active_state_from_inactive() {
+        let active_state = ActiveState::try_from("inactive").unwrap();
+        assert_eq!(active_state, ActiveState::Inactive);
+    }
+
+    // Convert some other string to an ActiveState. (It should fail.)
+    #[test]
+    fn test_active_state_from_other() {
+        match ActiveState::try_from("foo") {
+            Ok(_) => panic!("Conversion should have failed."),
+            Err(_) => {}
+        }
+    }
+
+    #[test]
+    // Create a String from an arbitrary ActiveState.
+    fn test_string_from_active_state() {
+        assert_eq!(String::from(ActiveState::Deactivating), "deactivating");
     }
 }

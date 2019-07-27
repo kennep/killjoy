@@ -15,6 +15,20 @@ impl Display for FindConfigFileError {
 
 impl Error for FindConfigFileError {}
 
+// An error indicating that parsing an object to an ActiveState failed.
+#[derive(Debug)]
+pub struct ParseAsActiveStateError {
+    pub msg: String,
+}
+
+impl Display for ParseAsActiveStateError {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "{}", &self.msg[..])
+    }
+}
+
+impl Error for ParseAsActiveStateError {}
+
 // An error indicating that parsing a configuration file failed.
 #[derive(Debug)]
 pub struct ParseConfigFileError {

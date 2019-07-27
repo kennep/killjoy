@@ -10,7 +10,6 @@ use dbus::{BusName, BusType};
 use serde::Deserialize;
 use xdg::BaseDirectories;
 
-use crate::bus;
 use crate::error::{FindConfigFileError, ParseConfigFileError, ParsePathError};
 use crate::unit::ActiveState;
 
@@ -147,7 +146,7 @@ impl TryFrom<SerdeRule> for Rule {
     fn try_from(value: SerdeRule) -> Result<Self, Self::Error> {
         let mut active_states: HashSet<ActiveState> = HashSet::new();
         for active_state_string in &value.active_states {
-            let active_state = bus::decode_active_state_str(&active_state_string[..])?;
+            let active_state = ActiveState::try_from(&active_state_string[..])?;
             active_states.insert(active_state);
         }
 

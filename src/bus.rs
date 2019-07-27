@@ -1,6 +1,7 @@
 // Logic for interacting with D-Bus buses.
 
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 use dbus::arg::Variant;
 use dbus::{BusName, BusType, ConnPath, Connection, Error, Message, Path, SignalArgs};
@@ -259,7 +260,7 @@ impl BusWatcher {
             Some(active_state_variant) => {
                 // active_state_variant: dbus::arg::Variant<Box<dbus::arg::RefArg + 'static>>
                 let active_state_str = active_state_variant.0.as_str().unwrap();
-                decode_active_state_str(active_state_str).unwrap()
+                ActiveState::try_from(active_state_str).unwrap()
             }
             None => return,
         };
@@ -327,7 +328,7 @@ impl BusWatcher {
 
         // Get and decode unit's ActiveState property.
         let active_state_str: &str = unit_props.get("ActiveState").unwrap().0.as_str().unwrap();
-        let active_state = decode_active_state_str(active_state_str).unwrap();
+        let active_state = ActiveState::try_from(active_state_str).unwrap();
 
         // Get timestamp at which that state was last entered.
         let timestamp_key = get_timestamp_key(active_state);
@@ -423,23 +424,6 @@ impl BusWatcher {
                 );
             }
         }
-    }
-}
-
-// Return the ActiveState enum entry corresponding to the given string.
-//
-// Return an error if the given string doesn't correspond to any enum entries.
-pub fn decode_active_state_str(active_state_str: &str) -> Result<ActiveState, String> {
-    match active_state_str {
-        "activating" => Ok(ActiveState::Activating),
-        "active" => Ok(ActiveState::Active),
-        "deactivating" => Ok(ActiveState::Deactivating),
-        "failed" => Ok(ActiveState::Failed),
-        "inactive" => Ok(ActiveState::Inactive),
-        _ => Err(format!(
-            "Failed to decode string as ActiveState: {}",
-            active_state_str,
-        )),
     }
 }
 
