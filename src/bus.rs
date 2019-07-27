@@ -4,7 +4,9 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use dbus::arg::Variant;
-use dbus::{BusName, BusType, ConnPath, Connection, Error, Message, Path, SignalArgs};
+use dbus::{
+    BusName, BusType, ConnPath, Connection, Error, Interface, Member, Message, Path, SignalArgs,
+};
 
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusProperties;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusPropertiesPropertiesChanged as PropertiesChanged;
@@ -175,10 +177,41 @@ impl BusWatcher {
             let matching_rules: Vec<&Rule> = self.settings.rules.iter().collect();
             let matching_rules = get_rules_matching_name(&matching_rules, &unit_name);
             let matching_rules = get_rules_matching_active_state(&matching_rules, active_state);
-            println!(
-                "{} state machine changed to {:?}. Matching rules: {:?}",
-                unit_name, active_state, matching_rules
-            );
+
+            for matching_rule in &matching_rules {
+                for notifier_name in &matching_rule.notifiers {
+                    let notifier = self.settings.notifiers.get(notifier_name).unwrap();
+
+                    let header_bus_name = notifier.get_bus_name();
+                    let header_path = make_path_like_bus_name(&header_bus_name);
+                    let header_interface = wrap_interface_for_killjoy_notifier();
+                    let header_member = wrap_member_for_notify();
+
+                    let body_unit_name = &unit_name;
+                    let body_old_state = "FIXME";
+                    let body_new_state = &String::from(active_state)[..];
+                    let body_timestamp = usm.timestamp();
+
+                    let msg = Message::method_call(
+                        &header_bus_name,
+                        &header_path,
+                        &header_interface,
+                        &header_member,
+                    )
+                    .append3::<&str, &str, &str>(body_unit_name, body_old_state, body_new_state)
+                    .append1::<u64>(body_timestamp);
+
+                    // A problem with merely send()ing a a message is that we have no idea if the
+                    // message got to its destination or not. If e.g. header_bus_name is incorrect,
+                    // we won't know.
+                    Connection::get_private(notifier.bus_type)
+                        .expect(
+                            &format!("Failed to connect to {:?} D-Bus bus.", notifier.bus_type)[..],
+                        )
+                        .send(msg)
+                        .unwrap();
+                }
+            }
         }
     }
 
@@ -460,6 +493,20 @@ fn get_timestamp_key(active_state: ActiveState) -> &'static str {
     }
 }
 
+// Given a bus name foo.bar.Biz1, make path /foo/bar/Biz1.
+//
+// Will panic if unable to make a string from the contents of `bus_name`, or if the Path object
+// being created does not contain a valid path name.
+fn make_path_like_bus_name(bus_name: &BusName) -> Path<'static> {
+    let mut path_str = bus_name
+        .as_cstr()
+        .to_str()
+        .expect("Failed to create string from contents of BusName.")
+        .replace(".", "/");
+    path_str.insert(0, '/');
+    Path::new(path_str).unwrap().to_owned()
+}
+
 // Tell whether at least one rule matches the given unit name.
 fn rules_match_name(rules: &[&Rule], unit_name: &str) -> bool {
     !get_rules_matching_name(rules, unit_name).is_empty()
@@ -475,14 +522,31 @@ fn wrap_path_for_systemd() -> Path<'static> {
     Path::new(PATH_FOR_SYSTEMD).unwrap()
 }
 
+fn wrap_interface_for_killjoy_notifier() -> Interface<'static> {
+    Interface::new("name.jerebear.KilljoyNotifier1").unwrap()
+}
+
+fn wrap_member_for_notify() -> Member<'static> {
+    Member::new("Notify").unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use dbus::Interface;
-
     use crate::settings::Expression;
     use crate::test_utils;
+
+    #[test]
+    fn test_make_path_like_bus_name() {
+        let bus_name = BusName::new("com.example.App1").unwrap();
+        let path = make_path_like_bus_name(&bus_name);
+        let path_str = path
+            .as_cstr()
+            .to_str()
+            .expect("Failed to create string from contents of Path.");
+        assert_eq!(path_str, "/com/example/App1");
+    }
 
     // Let the unit name match zero of two rules.
     #[test]
@@ -584,6 +648,16 @@ mod tests {
     #[test]
     fn test_wrap_path_for_systemd() {
         wrap_path_for_systemd();
+    }
+
+    #[test]
+    fn test_wrap_interface_for_killjoy_notifier() {
+        wrap_interface_for_killjoy_notifier();
+    }
+
+    #[test]
+    fn test_wrap_member_for_notify() {
+        wrap_member_for_notify();
     }
 
     #[test]

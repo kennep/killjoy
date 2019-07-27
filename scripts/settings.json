@@ -26,7 +26,7 @@
     "notifiers": {
         "desktop popup": {
             "bus_type": "session",
-            "bus_name": "org.freedesktop.Notifications"
+            "bus_name": "name.jerebear.KilljoyNotifierNotification1"
         }
     }
 }

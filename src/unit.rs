@@ -92,6 +92,10 @@ impl UnitStateMachine {
     pub fn active_state(&self) -> ActiveState {
         self.active_state
     }
+
+    pub fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
 }
 
 #[cfg(test)]
