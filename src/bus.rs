@@ -190,13 +190,13 @@ impl BusWatcher {
                     let header_interface = wrap_interface_for_killjoy_notifier();
                     let header_member = wrap_member_for_notify();
 
-                    let body_unit_name = &unit_name;
-                    let body_old_state = match old_state {
-                        Some(val) => format!("{}", val),
-                        None => "(unknown)".to_string(),
-                    };
-                    let body_new_state = &String::from(active_state)[..];
                     let body_timestamp = usm.timestamp();
+                    let body_unit_name = &unit_name;
+                    let mut body_active_states: Vec<String> = Vec::new();
+                    if let Some(old_state) = old_state {
+                        body_active_states.push(String::from(old_state));
+                    }
+                    body_active_states.push(String::from(active_state));
 
                     let msg = Message::method_call(
                         &header_bus_name,
@@ -204,8 +204,11 @@ impl BusWatcher {
                         &header_interface,
                         &header_member,
                     )
-                    .append3::<&str, &str, &str>(body_unit_name, &body_old_state, body_new_state)
-                    .append1::<u64>(body_timestamp);
+                    .append3::<u64, &str, &Vec<String>>(
+                        body_timestamp,
+                        body_unit_name,
+                        &body_active_states,
+                    );
 
                     // A problem with merely send()ing a a message is that we have no idea if the
                     // message got to its destination or not. If e.g. header_bus_name is incorrect,
