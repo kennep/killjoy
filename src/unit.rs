@@ -1,6 +1,7 @@
 // Logic for representing units.
 
 use std::convert::TryFrom;
+use std::fmt::{Display, Formatter, Result as FmtResult};
 
 use crate::error::ParseAsActiveStateError;
 
@@ -23,6 +24,20 @@ pub enum ActiveState {
     Inactive,
 }
 
+impl Display for ActiveState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        let msg = match self {
+            ActiveState::Activating => "activating",
+            ActiveState::Active => "active",
+            ActiveState::Deactivating => "deactivating",
+            ActiveState::Failed => "failed",
+            ActiveState::Inactive => "inactive",
+        };
+        write!(f, "{}", msg)
+    }
+}
+
+// Useful when reading from a configuration file.
 impl TryFrom<&str> for ActiveState {
     type Error = ParseAsActiveStateError;
 
@@ -40,6 +55,7 @@ impl TryFrom<&str> for ActiveState {
     }
 }
 
+// Useful when writing to a bus or configuration file.
 impl From<ActiveState> for String {
     fn from(value: ActiveState) -> String {
         match value {
@@ -62,13 +78,13 @@ impl UnitStateMachine {
     // Initialize the state machine's attributes and call `on_change()`.
     pub fn new<T>(active_state: ActiveState, timestamp: u64, on_change: &T) -> Self
     where
-        T: Fn(&UnitStateMachine),
+        T: Fn(&UnitStateMachine, Option<ActiveState>),
     {
         let usm = UnitStateMachine {
             active_state,
             timestamp,
         };
-        on_change(&usm);
+        on_change(&usm, None);
         usm
     }
 
@@ -78,13 +94,14 @@ impl UnitStateMachine {
     // the state machine's attributes. If the `active_state` change, call `on_change()`.
     pub fn update<T>(&mut self, active_state: ActiveState, timestamp: u64, on_change: &T)
     where
-        T: Fn(&UnitStateMachine),
+        T: Fn(&UnitStateMachine, Option<ActiveState>),
     {
         if self.timestamp < timestamp {
             self.timestamp = timestamp;
             if self.active_state != active_state {
+                let old_state = self.active_state;
                 self.active_state = active_state;
-                on_change(&self);
+                on_change(&self, Some(old_state));
             }
         }
     }
@@ -105,7 +122,7 @@ mod tests {
     // Pass a unit state and a timestamp.
     #[test]
     fn test_usm_new() {
-        let on_change = |_: &UnitStateMachine| {};
+        let on_change = |_: &UnitStateMachine, _: Option<ActiveState>| {};
         let usm = UnitStateMachine::new(ActiveState::Failed, 10, &on_change);
         assert_eq!(usm.active_state, ActiveState::Failed);
         assert_eq!(usm.timestamp, 10);
@@ -114,7 +131,7 @@ mod tests {
     // Unsuccessfully update the state machine.
     #[test]
     fn test_usm_update_v1() {
-        let on_change = |_: &UnitStateMachine| {};
+        let on_change = |_: &UnitStateMachine, _: Option<ActiveState>| {};
         let mut usm = UnitStateMachine::new(ActiveState::Inactive, 25, &on_change);
 
         usm.update(ActiveState::Activating, 24, &on_change);
@@ -129,7 +146,7 @@ mod tests {
     // Successfully update the state machine.
     #[test]
     fn test_usm_update_v2() {
-        let on_change = |_: &UnitStateMachine| {};
+        let on_change = |_: &UnitStateMachine, _: Option<ActiveState>| {};
         let mut usm = UnitStateMachine::new(ActiveState::Inactive, 25, &on_change);
 
         usm.update(ActiveState::Activating, 26, &on_change);
@@ -183,6 +200,12 @@ mod tests {
             Ok(_) => panic!("Conversion should have failed."),
             Err(_) => {}
         }
+    }
+
+    #[test]
+    fn test_active_state_display() {
+        let displayed = format!("{}", ActiveState::Deactivating);
+        assert_eq!(&displayed[..], "deactivating");
     }
 
     #[test]

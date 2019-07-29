@@ -171,8 +171,11 @@ impl BusWatcher {
     }
 
     // Generate callback for use in case a unit state machine changes.
-    fn gen_on_change<'a>(&'a self, unit_name: &'a str) -> impl Fn(&UnitStateMachine) + 'a {
-        move |usm: &UnitStateMachine| {
+    fn gen_on_change<'a>(
+        &'a self,
+        unit_name: &'a str,
+    ) -> impl Fn(&UnitStateMachine, Option<ActiveState>) + 'a {
+        move |usm: &UnitStateMachine, old_state: Option<ActiveState>| {
             let active_state = usm.active_state();
             let matching_rules: Vec<&Rule> = self.settings.rules.iter().collect();
             let matching_rules = get_rules_matching_name(&matching_rules, &unit_name);
@@ -188,7 +191,10 @@ impl BusWatcher {
                     let header_member = wrap_member_for_notify();
 
                     let body_unit_name = &unit_name;
-                    let body_old_state = "FIXME";
+                    let body_old_state = match old_state {
+                        Some(val) => format!("{}", val),
+                        None => "(unknown)".to_string(),
+                    };
                     let body_new_state = &String::from(active_state)[..];
                     let body_timestamp = usm.timestamp();
 
@@ -198,7 +204,7 @@ impl BusWatcher {
                         &header_interface,
                         &header_member,
                     )
-                    .append3::<&str, &str, &str>(body_unit_name, body_old_state, body_new_state)
+                    .append3::<&str, &str, &str>(body_unit_name, &body_old_state, body_new_state)
                     .append1::<u64>(body_timestamp);
 
                     // A problem with merely send()ing a a message is that we have no idea if the
