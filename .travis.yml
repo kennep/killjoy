@@ -1,35 +1,31 @@
+# See: https://docs.travis-ci.com/user/languages/rust/
+
 language: rust
 
-# Test against all three channels of Rust. In the spirit of the Rust community
-# it's appreciated if tested against all three channels.
 rust:
-    - stable
-    - beta
-    - nightly
+  - stable
+  - beta
+  - nightly
 
-# It's okay for nightly to fail
 matrix:
-    allow_failures:
-        - rust: nightly
+  allow_failures:
+    - rust: nightly
 
-# Install necessary system packages
 addons:
-    apt:
-        packages:
-            - libdbus-1-dev
+  apt:
+    packages:
+      - libdbus-1-dev
 
-# Cache the dependencies so they are only recompiled if they or the compiler were upgraded
-# See https://docs.travis-ci.com/user/languages/rust/#dependency-management for more info.
 cache: cargo
 
-# Install clippy and fmt so they're available for the script
+# Clippy and rustfmt are available as of Rust 1.31/2018. See:
+# https://blog.rust-lang.org/2018/12/06/Rust-1.31-and-rust-2018.html#new-tools
 before_script:
-    - rustup component add clippy
-    - rustup component add rustfmt
+  - rustup component add clippy
+  - rustup component add rustfmt
 
-# Be thorough, test everything available
 script:
-    - cargo check
-    - cargo test
-    - cargo clippy
-    - cargo fmt && git diff --exit-code
+  - cargo check
+  - cargo test
+  - cargo clippy
+  - cargo fmt && git diff --exit-code
