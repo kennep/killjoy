@@ -349,8 +349,11 @@ pub fn get_load_path() -> Result<String, Box<dyn Error>> {
 /// *   The file contained invalid contents. See [Settings::new](struct.Settings.html#method.new).
 ///
 /// [`Settings`]: struct.Settings.html
-pub fn load() -> Result<Settings, Box<dyn Error>> {
-    let load_path = get_load_path()?;
+pub fn load(path: Option<&str>) -> Result<Settings, Box<dyn Error>> {
+    let load_path = match path {
+        Some(path) => path.to_owned(),
+        None => get_load_path()?,
+    };
     let handle = match File::open(load_path) {
         Ok(handle) => handle,
         Err(err) => return Err(Box::new(err)),

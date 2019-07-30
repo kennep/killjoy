@@ -3,7 +3,7 @@
 use std::cmp;
 
 use clap;
-use clap::{App, AppSettings, ArgMatches, SubCommand};
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use regex::Regex;
 use textwrap::{HyphenSplitter, Wrapper};
 
@@ -26,7 +26,11 @@ pub fn get_cli_args<'a>() -> ArgMatches<'a> {
                 .subcommand(
                     SubCommand::with_name("validate")
                         .about("Validate the settings file.")
-                        .help(&help_messages.settings_validate[..]),
+                        .help(&help_messages.settings_validate[..])
+                        .arg(
+                            Arg::with_name("path")
+                                .help("The path to the settings file to validate."),
+                        ),
                 ),
         )
         .get_matches()

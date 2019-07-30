@@ -17,7 +17,7 @@ fn main() {
 fn handle_settings_subcommand(args: &ArgMatches) {
     match args.subcommand() {
         ("load-path", Some(_)) => handle_settings_load_path_subcommand(),
-        ("validate", Some(_)) => handle_settings_validate_subcommand(),
+        ("validate", Some(sub_args)) => handle_settings_validate_subcommand(&sub_args),
         _ => eprintln!("An unexpected code path executed. Please contact the developer."),
     }
 }
@@ -35,18 +35,18 @@ fn handle_settings_load_path_subcommand() {
 }
 
 // Handle the 'settings validate' subcommand.
-fn handle_settings_validate_subcommand() {
-    get_settings_or_exit();
+fn handle_settings_validate_subcommand(args: &ArgMatches) {
+    get_settings_or_exit(args.value_of("path"));
 }
 
 // Handle no subcommand at all.
 fn handle_no_subcommand() {
-    killjoy::run(&get_settings_or_exit());
+    killjoy::run(&get_settings_or_exit(None));
 }
 
 // Get and return a settings object, or print a message to stderr and exit with a non-zero code.
-fn get_settings_or_exit() -> Settings {
-    match settings::load() {
+fn get_settings_or_exit(path: Option<&str>) -> Settings {
+    match settings::load(path) {
         Ok(settings_obj) => settings_obj,
         Err(err) => {
             eprintln!("{}", err);
