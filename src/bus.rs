@@ -192,11 +192,11 @@ impl BusWatcher {
 
                     let body_timestamp = usm.timestamp();
                     let body_unit_name = &unit_name;
-                    let mut body_active_states: Vec<String> = Vec::new();
+                    // order from newest to oldest
+                    let mut body_active_states: Vec<String> = vec![String::from(active_state)];
                     if let Some(old_state) = old_state {
                         body_active_states.push(String::from(old_state));
                     }
-                    body_active_states.push(String::from(active_state));
 
                     let msg = Message::method_call(
                         &header_bus_name,
