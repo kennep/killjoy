@@ -1,11 +1,8 @@
 //! Logic for interacting with the CLI.
 
-use std::cmp;
-
 use clap;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use regex::Regex;
-use textwrap::{HyphenSplitter, Wrapper};
 
 /// Consume CLI arguments, parse them, validate them, and return the digested result.
 pub fn get_cli_args<'a>() -> ArgMatches<'a> {
@@ -14,6 +11,7 @@ pub fn get_cli_args<'a>() -> ArgMatches<'a> {
         .version(clap::crate_version!())
         .author("Jeremy Audet <jerebear@protonmail.com>")
         .about("Monitor systemd units.")
+        .max_term_width(100)
         .subcommand(
             SubCommand::with_name("settings")
                 .about("Manage the settings file.")
@@ -45,22 +43,15 @@ struct HelpMessages {
 // A factory for generating `HelpMessages` structs.
 struct HelpMessagesFactory {
     re: Regex,
-    wrapper: Wrapper<'static, HyphenSplitter>,
 }
 
 impl HelpMessagesFactory {
-    // On narrow terminals, text shall be wrapped to the width of the terminal. On wide terminals,
-    // text shall be wrapped at an arbitrary bound. This latter requirement aids readability, as
-    // failing to wrap code on especially wide terminals harms legibility.
-    const MAX_WIDTH: usize = 100;
-
     // Create a new factory.
     //
     // Creating a factory can be an expensive operation, as it involves compiling a regex.
     fn new() -> Self {
         let re = Self::get_re();
-        let wrapper = Wrapper::new(cmp::min(textwrap::termwidth(), Self::MAX_WIDTH));
-        HelpMessagesFactory { re, wrapper }
+        HelpMessagesFactory { re }
     }
 
     // Create a struct containing help messages formatted for the current terminal.
@@ -81,8 +72,7 @@ impl HelpMessagesFactory {
     fn format(&self, msg: &str) -> String {
         let msg: String = textwrap::dedent(msg);
         let msg: std::borrow::Cow<str> = self.re.replace_all(msg.trim(), "$pre $post");
-        let msg: String = self.wrapper.fill(&msg);
-        msg
+        msg.into_owned()
     }
 
     // Compile a RE that strips intra-paragraph newlines. Given this text:
