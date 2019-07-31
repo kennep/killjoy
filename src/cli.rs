@@ -21,12 +21,12 @@ pub fn get_cli_args<'a>() -> ArgMatches<'a> {
                 .subcommand(
                     SubCommand::with_name("load-path")
                         .about("Print the path to the file from which settings are loaded.")
-                        .help(&help_messages.settings_load_path[..]),
+                        .after_help(&help_messages.settings_load_path[..]),
                 )
                 .subcommand(
                     SubCommand::with_name("validate")
                         .about("Validate the settings file.")
-                        .help(&help_messages.settings_validate[..])
+                        .after_help(&help_messages.settings_validate[..])
                         .arg(
                             Arg::with_name("path")
                                 .help("The path to the settings file to validate."),
