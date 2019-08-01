@@ -1,4 +1,4 @@
-//! Logic for dealing with settings files.
+// Logic for dealing with settings files.
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
@@ -13,7 +13,7 @@ use xdg::BaseDirectories;
 use crate::error::{FindConfigFileError, ParseConfigFileError, ParsePathError};
 use crate::unit::ActiveState;
 
-/// The expressions that a user may use to match unit names.
+// The expressions that a user may use to match unit names.
 #[derive(Clone, Debug)]
 pub enum Expression {
     Regex(regex::Regex),
@@ -22,44 +22,13 @@ pub enum Expression {
 }
 
 impl Expression {
-    /// Check whether this expression matches the given `unit_name`.
-    ///
-    /// A `UnitName` expression matches unit names (typically discovered via systemd) against a unit
-    /// name:
-    ///
-    ///     use killjoy::settings::Expression;
-    ///
-    ///     let unit_name = "aaa.service";
-    ///     let expression = Expression::UnitName("aaa.service".to_string());
-    ///     assert!(expression.matches(&unit_name));
-    ///
-    ///     let expression = Expression::UnitName(".service".to_string());
-    ///     assert!(!expression.matches(&unit_name));
-    ///
-    /// A `UnitType` expression matches unit names against a unit type:
-    ///
-    ///     use killjoy::settings::Expression;
-    ///
-    ///     let unit_name = "aaa.service";
-    ///     let expression = Expression::UnitType(".service".to_string());
-    ///     assert!(expression.matches(&unit_name));
-    ///
-    ///     let expression = Expression::UnitType(".mount".to_string());
-    ///     assert!(!expression.matches(&unit_name));
-    ///
-    /// A `Regex` expression matches unit names against a regular expression:
-    ///
-    ///     use killjoy::settings::Expression;
-    ///     use regex::Regex;
-    ///
-    ///     let expression = Expression::Regex(Regex::new(r"a\.service").unwrap());
-    ///     assert!(!expression.matches(".service"));
-    ///     assert!(expression.matches("a.service"));
-    ///     assert!(expression.matches("aa.service"));
-    ///
-    /// Regular expressions are implemented with the [regex] crate.
-    ///
-    /// [regex]: https://docs.rs/regex/
+    // Check whether this expression matches the given `unit_name`.
+    //
+    // A `UnitName` expression matches unit names against a unit name. A `UnitType` expression
+    // matches unit names against a unit type. A `Regex` expression matches unit names against a
+    // regular expression.
+    //
+    // Regular expressions are implemented with the regex crate. See: https://docs.rs/regex/
     pub fn matches(&self, unit_name: &str) -> bool {
         match &self {
             Expression::Regex(expr) => expr.is_match(unit_name),
@@ -69,10 +38,10 @@ impl Expression {
     }
 }
 
-/// A D-Bus service that may be contacted when an event of interest happens.
-///
-/// When an event of interest occurs, killjoy will connect to `bus_type` and send a message to
-/// `bus_name`.
+// A D-Bus service that may be contacted when an event of interest happens.
+//
+// When an event of interest occurs, killjoy will connect to `bus_type` and send a message to
+// `bus_name`.
 #[derive(Clone, Debug)]
 pub struct Notifier {
     bus_name: String,
@@ -80,23 +49,9 @@ pub struct Notifier {
 }
 
 impl Notifier {
-    /// Create a new notifier.
-    ///
-    /// Return an error if any arguments are invalid.
-    ///
-    ///     use dbus::BusType;
-    ///     use killjoy::settings::Notifier;
-    ///
-    ///     let bus_name = "org.freedesktop.Notifications";
-    ///     let bus_type = BusType::Session;
-    ///     Notifier::new(bus_name, bus_type).unwrap();
-    ///
-    ///     let bus_name = "org/freedesktop/Notifications";
-    ///     match Notifier::new(bus_name, bus_type) {
-    ///         Ok(_) => panic!("bus_name should have been invalid"),
-    ///         Err(_) => { }
-    ///     }
-    ///
+    // Create a new notifier.
+    //
+    // Return an error if any arguments are invalid.
     pub fn new(bus_name: &str, bus_type: BusType) -> Result<Self, Box<dyn Error>> {
         let new_obj = Self {
             bus_name: bus_name.to_owned(),
@@ -127,11 +82,11 @@ impl TryFrom<SerdeNotifier> for Notifier {
     }
 }
 
-/// Units to watch, and notifiers to contact when any of them enter a state of interest.
-///
-/// Upon startup, killjoy will connect to `bus_type`. It will watch all units whose name matches
-/// `expression`. Whenever one of those units' ActiveState property transitions to one of the
-/// `active_states` it will contact `notifiers`.
+// Units to watch, and notifiers to contact when any of them enter a state of interest.
+//
+// Upon startup, killjoy will connect to `bus_type`. It will watch all units whose name matches
+// `expression`. Whenever one of those units' ActiveState property transitions to one of the
+// `active_states` it will contact `notifiers`.
 #[derive(Clone, Debug)]
 pub struct Rule {
     pub active_states: HashSet<ActiveState>,
@@ -173,39 +128,10 @@ impl TryFrom<SerdeRule> for Rule {
     }
 }
 
-/// A deserialized copy of a configuration file.
-///
-/// Here's an example of what a configuration file may look like:
-///
-///     use dbus::BusType;
-///     use killjoy::settings::Settings;
-///
-///     let settings_bytes = r###"
-///         {
-///             "notifiers": {
-///                 "desktop popup": {
-///                     "bus_name": "org.freedesktop.Notifications",
-///                     "bus_type": "session"
-///                 }
-///             },
-///             "rules": [{
-///                     "active_states": ["failed"],
-///                     "bus_type": "session",
-///                     "expression": "syncthing.service",
-///                     "expression_type": "unit name",
-///                     "notifiers": ["desktop popup"]
-///             }],
-///             "version": 1
-///         }
-///     "###.as_bytes();
-///     let settings: Settings = Settings::new(settings_bytes).unwrap();
-///
-///     let target = BusType::Session;
-///     let actual = settings.notifiers.get("desktop popup").unwrap().bus_type;
-///     assert_eq!(target, actual);
-///
-/// Beware that `Settings` instances may have semantically invalid values. For example, the
-/// notifier's `bus_name` shown in the example above might not be a valid D-Bus bus name.
+// A deserialized copy of a configuration file.
+//
+// Beware that `Settings` instances may have semantically invalid values. For example, a notifier's
+// `bus_name` might be syntactically valid but may point to a non-existent entity.
 #[derive(Clone, Debug)]
 pub struct Settings {
     pub notifiers: HashMap<String, Notifier>,
@@ -213,18 +139,15 @@ pub struct Settings {
 }
 
 impl Settings {
-    /// Create a new settings object.
-    ///
-    /// For a usage example, see [`Settings`]. An error may be returned for one of two broad
-    /// categories of reasons:
-    ///
-    /// *   Deserialization of the `reader` failed. Maybe the reader yielded non-unicode bytes;
-    ///     maybe the bytes were valid unicode but not valid JSON; maybe the unicode was valid JSON
-    ///     but didn't match the settings file schema; or so on.
-    /// *   The settings object contained semantically invalid data. Maybe a `"bus_type"` key was
-    ///     set to a value such as `"foo"`, or so on.
-    ///
-    /// [`Settings`]: struct.Settings.html
+    // Create a new settings object.
+    //
+    // An error may be returned for one of two broad categories of reasons:
+    //
+    // *   Deserialization of the `reader` failed. Maybe the reader yielded non-unicode bytes; maybe
+    //     the bytes were valid unicode but not valid JSON; maybe the unicode was valid JSON but
+    //     didn't match the settings file schema; or so on.
+    // *   The settings object contained semantically invalid data. Maybe a `"bus_type"` key was set
+    //     to a value such as `"foo"`, or so on.
     pub fn new<T: Read>(reader: T) -> Result<Self, Box<dyn Error>> {
         let serde_settings: SerdeSettings = serde_json::from_reader(reader)?;
         let settings = Self::try_from(serde_settings)?;
@@ -321,9 +244,23 @@ pub fn encode_bus_type(bus_type: BusType) -> String {
     }
 }
 
-/// Search several paths for a settings file, in order of preference.
-///
-/// If a file is found, return its path. Otherwise, return an error describing why.
+// Get a deduplicated list of D-Bus bus types in the given list of rules.
+pub fn get_bus_types(rules: &[Rule]) -> Vec<BusType> {
+    // The conversion from BusType → String → BusType is a hack. It's done because this method
+    // should deduplicate BusType values, but BusType doesn't implement the traits necessary to
+    // create a HashSet<BusType>.
+    rules
+        .iter()
+        .map(|rule: &Rule| encode_bus_type(rule.bus_type))
+        .collect::<HashSet<String>>()
+        .into_iter()
+        .map(|bus_type_str: String| decode_bus_type_str(&bus_type_str[..]).unwrap())
+        .collect()
+}
+
+// Search several paths for a settings file, in order of preference.
+//
+// If a file is found, return its path. Otherwise, return an error describing why.
 pub fn get_load_path() -> Result<String, Box<dyn Error>> {
     let dirs = match BaseDirectories::with_prefix("killjoy") {
         Ok(dirs) => dirs,
@@ -340,15 +277,13 @@ pub fn get_load_path() -> Result<String, Box<dyn Error>> {
     Ok(path)
 }
 
-/// Read the configuration file into a [`Settings`] object.
-///
-/// An error may be returned for one of two broad categories of reasons:
-///
-/// *   The file couldn't be opened. Maybe a settings file couldn't be found; or maybe a settings
-///     file was found but could not be opened.
-/// *   The file contained invalid contents. See [Settings::new](struct.Settings.html#method.new).
-///
-/// [`Settings`]: struct.Settings.html
+// Read the configuration file into a Settings object.
+//
+// An error may be returned for one of two broad categories of reasons:
+//
+// *   The file couldn't be opened. Maybe a settings file couldn't be found; or maybe a settings
+//     file was found but could not be opened.
+// *   The file contained invalid contents. See [Settings::new](struct.Settings.html#method.new).
 pub fn load(path: Option<&str>) -> Result<Settings, Box<dyn Error>> {
     let load_path = match path {
         Some(path) => path.to_owned(),
@@ -361,4 +296,163 @@ pub fn load(path: Option<&str>) -> Result<Settings, Box<dyn Error>> {
     let reader = BufReader::new(handle);
     let settings = Settings::new(reader)?;
     Ok(settings)
+}
+
+#[cfg(test)]
+pub mod test_utils {
+    use crate::settings::{Expression, Rule};
+    use dbus::BusType;
+    use std::collections::HashSet;
+
+    pub fn gen_session_rule() -> Rule {
+        Rule {
+            active_states: HashSet::new(),
+            bus_type: BusType::Session,
+            expression: Expression::UnitName("".to_string()),
+            notifiers: Vec::new(),
+        }
+    }
+
+    pub fn gen_system_rule() -> Rule {
+        Rule {
+            active_states: HashSet::new(),
+            bus_type: BusType::System,
+            expression: Expression::UnitName("".to_string()),
+            notifiers: Vec::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_get_bus_types_v1() {
+        let settings = Settings {
+            notifiers: HashMap::new(),
+            rules: Vec::new(),
+        };
+        let bus_types = get_bus_types(&settings.rules);
+        assert!(!bus_types.contains(&BusType::Session));
+        assert!(!bus_types.contains(&BusType::System));
+    }
+
+    #[test]
+    fn test_get_bus_types_v2() {
+        let settings = Settings {
+            notifiers: HashMap::new(),
+            rules: vec![test_utils::gen_session_rule()],
+        };
+        let bus_types: Vec<BusType> = get_bus_types(&settings.rules);
+        assert!(bus_types.contains(&BusType::Session));
+        assert!(!bus_types.contains(&BusType::System));
+    }
+
+    #[test]
+    fn test_get_bus_types_v3() {
+        let settings = Settings {
+            notifiers: HashMap::new(),
+            rules: vec![test_utils::gen_system_rule()],
+        };
+        let bus_types: Vec<BusType> = get_bus_types(&settings.rules);
+        assert!(!bus_types.contains(&BusType::Session));
+        assert!(bus_types.contains(&BusType::System));
+    }
+
+    #[test]
+    fn test_get_bus_types_v4() {
+        let settings = Settings {
+            notifiers: HashMap::new(),
+            rules: vec![
+                test_utils::gen_session_rule(),
+                test_utils::gen_system_rule(),
+            ],
+        };
+        let bus_types: Vec<BusType> = get_bus_types(&settings.rules);
+        assert!(bus_types.contains(&BusType::Session));
+        assert!(bus_types.contains(&BusType::System));
+    }
+
+    #[test]
+    fn test_expression_unit_name_matches_success() {
+        let unit_name = "aaa.service";
+        let expression = Expression::UnitName("aaa.service".to_string());
+        assert!(expression.matches(&unit_name));
+    }
+
+    #[test]
+    fn test_expression_unit_name_matches_failure() {
+        let unit_name = "aaa.service";
+        let expression = Expression::UnitName("aa.service".to_string());
+        assert!(!expression.matches(&unit_name));
+    }
+
+    #[test]
+    fn test_expression_unit_type_matches_success() {
+        let unit_name = "aaa.service";
+        let expression = Expression::UnitType(".service".to_string());
+        assert!(expression.matches(&unit_name));
+    }
+
+    #[test]
+    fn test_expression_unit_type_matches_failure() {
+        let unit_name = "aaa.service";
+        let expression = Expression::UnitType(".mount".to_string());
+        assert!(!expression.matches(&unit_name));
+    }
+
+    #[test]
+    fn test_expression_regex_matches() {
+        let expression = Expression::Regex(regex::Regex::new(r"a\.service").unwrap());
+        assert!(!expression.matches(".service"));
+        assert!(expression.matches("a.service"));
+        assert!(expression.matches("aa.service"));
+    }
+
+    #[test]
+    fn test_notifier_new_success() {
+        let bus_name = "org.freedesktop.Notifications";
+        let bus_type = BusType::Session;
+        Notifier::new(bus_name, bus_type).unwrap();
+    }
+
+    #[test]
+    fn test_notifier_new_failure() {
+        let bus_name = "org/freedesktop/Notifications";
+        let bus_type = BusType::Session;
+        match Notifier::new(bus_name, bus_type) {
+            Ok(_) => panic!("bus_name should have been invalid"),
+            Err(_) => {}
+        }
+    }
+
+    #[test]
+    fn test_settings_new_success() {
+        let settings_str = r###"
+            {
+                "notifiers": {
+                    "desktop popup": {
+                        "bus_name": "org.freedesktop.Notifications",
+                        "bus_type": "session"
+                    }
+                },
+                "rules": [{
+                        "active_states": ["failed"],
+                        "bus_type": "session",
+                        "expression": "syncthing.service",
+                        "expression_type": "unit name",
+                        "notifiers": ["desktop popup"]
+                }],
+                "version": 1
+            }
+        "###;
+        let settings: Settings = Settings::new(settings_str.as_bytes()).unwrap();
+
+        let actual = settings.notifiers.get("desktop popup").unwrap().bus_type;
+        let target = BusType::Session;
+        assert_eq!(actual, target);
+    }
 }

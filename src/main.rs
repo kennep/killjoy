@@ -1,8 +1,67 @@
+// Keep the following in sync with the readme.
+/*!
+ * Killjoy is a [systemd] unit monitoring application.
+ *
+ * What is systemd?
+ *
+ * > systemd is a suite of basic building blocks for a Linux system. It provides a system and
+ * > service manager that runs as PID 1 and starts the rest of the system.
+ *
+ * Units are the resources that systemd knows how to manage. For example, the unit corresponding to
+ * the nginx web server might be `nginx.service`, and the unit corresponding to the `/boot` mount
+ * point might be `boot.mount`, though naming can vary per Linux distribution.
+ *
+ * Killjoy watches for a configurable list of events, such as "`nginx.service` failed," or
+ * "`my-backup.service` is activating, active, or deactivating." Killjoy responds to these events by
+ * reaching out across a D-Bus and contacting a configurable list of notifiers. In turn, the
+ * notifiers are responsible for generating desktop pop-ups, sending emails, or otherwise taking
+ * action.
+ *
+ * A small number of notifiers are developed alongside killjoy. However, the clear separation
+ * between the watcher (killjoy) and the notifiers means that anyone can write and distribute a
+ * custom notifier at any time, with no changes to killjoy itself. Want to start the WiFi coffee
+ * maker when the daily backup service kicks off? Go for it.
+ *
+ * Killjoy is inspired by [sagbescheid], [SystemdMon], [pynagsystemd], and [`OnFailure=`], but there
+ * are differences in efficiency, reliability, features, and flexibility. Killjoy assumes knowledge
+ * of [systemd]. For additional information, see [systemd(1)], especially the section on [concepts].
+ *
+ * Dependencies
+ * ------------
+ *
+ * Most dependencies used by Killjoy are pure Rust libraries and are listed in `Cargo.toml`.
+ * However, Killjoy indirectly requires libdbus at runtime. (On Ubuntu, install `libdbus-1-dev`.)
+ * For details, see the Rust dbus library's [requirements].
+ *
+ * License
+ * -------
+ *
+ * Killjoy is licensed under the GPLv3 or any later version.
+ *
+ * [SystemdMon]: https://github.com/joonty/systemd_mon
+ * [`OnFailure=`]: https://www.freedesktop.org/software/systemd/man/systemd.unit.html
+ * [concepts]: https://www.freedesktop.org/software/systemd/man/systemd.html#Concepts
+ * [pynagsystemd]: https://github.com/kbytesys/pynagsystemd
+ * [requirements]: https://github.com/diwic/dbus-rs#requirements
+ * [sagbescheid]: https://sagbescheid.readthedocs.io/en/latest/
+ * [systemd(1)]: https://www.freedesktop.org/software/systemd/man/systemd.html
+ * [systemd]: https://freedesktop.org/wiki/Software/systemd/
+ */
+
+mod bus;
+mod cli;
+mod error;
+mod generated;
+mod settings;
+mod unit;
+
 use std::process;
+use std::thread;
 
 use clap::ArgMatches;
 
-use killjoy::{cli, settings, settings::Settings};
+use crate::bus::BusWatcher;
+use crate::settings::Settings;
 
 // The entry point for the application.
 fn main() {
@@ -40,8 +99,22 @@ fn handle_settings_validate_subcommand(args: &ArgMatches) {
 }
 
 // Handle no subcommand at all.
+//
+// For each unique D-Bus bus listed in the settings file, spawn a thread. Each thread connects to a
+// D-Bus bus, and talks to the instance of systemd available on that bus, and the notifiers
+// available on that bus.
 fn handle_no_subcommand() {
-    killjoy::run(&get_settings_or_exit(None));
+    let settings: Settings = get_settings_or_exit(None);
+    let handles: Vec<_> = settings::get_bus_types(&settings.rules)
+        .into_iter()
+        .map(|bus_type| {
+            let settings_clone = settings.clone();
+            thread::spawn(move || BusWatcher::new(bus_type, settings_clone).run())
+        })
+        .collect();
+    for handle in handles {
+        handle.join().unwrap();
+    }
 }
 
 // Get and return a settings object, or print a message to stderr and exit with a non-zero code.

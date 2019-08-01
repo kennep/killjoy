@@ -7,8 +7,20 @@ is removed.**
 
 Killjoy is a systemd unit monitoring application.
 
-Killjoy watches for a configurable list of events, such as "a mount point
-failed" or "my backup service is active," and responds by contacting a
+What is systemd?
+
+> systemd is a suite of basic building blocks for a Linux system. It provides a
+> system and service manager that runs as PID 1 and starts the rest of the
+> system.
+
+Units are the resources that systemd knows how to manage. For example, the unit
+corresponding to the nginx web server might be `nginx.service`, and the unit
+corresponding to the `/boot` mount point might be `boot.mount`, though naming
+can vary per Linux distribution.
+
+Killjoy watches for a configurable list of events, such as "`nginx.service`
+failed," or "`my-backup.service` is activating, active, or deactivating."
+Killjoy responds to these events by reaching out across a D-Bus and contacting a
 configurable list of notifiers. In turn, the notifiers are responsible for
 generating desktop pop-ups, sending emails, or otherwise taking action.
 
@@ -35,8 +47,9 @@ Dependencies
 ------------
 
 Most dependencies used by Killjoy are pure Rust libraries and are listed in
-'Cargo.toml'. However, Killjoy indirectly requires libdbus to be installed on
-the system to function (libdbus-1-dev on Debian/Ubuntu distros).
+`Cargo.toml`. However, Killjoy indirectly requires libdbus at runtime. (On
+Ubuntu, install `libdbus-1-dev`.) For details, see the Rust dbus library's
+[requirements](https://github.com/diwic/dbus-rs#requirements).
 
 License
 -------

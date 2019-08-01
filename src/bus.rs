@@ -15,11 +15,14 @@ use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1ManagerUni
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1ManagerUnitRemoved as UnitRemoved;
 use crate::settings::{Rule, Settings};
 use crate::unit::{ActiveState, UnitStateMachine};
-use crate::VERBOSE;
 
 const BUS_NAME_FOR_SYSTEMD: &str = "org.freedesktop.systemd1";
 const PATH_FOR_SYSTEMD: &str = "/org/freedesktop/systemd1";
 const INTERFACE_FOR_SYSTEMD_UNIT: &str = "org.freedesktop.systemd1.Unit";
+
+// How verbose should error messages be? This is a kludge, and should be replaced with proper
+// logging infrastructure.
+const VERBOSE: bool = false;
 
 // Watch units appear and disappear on a bus, and take actions in response.
 pub struct BusWatcher {
@@ -543,8 +546,7 @@ fn wrap_member_for_notify() -> Member<'static> {
 mod tests {
     use super::*;
 
-    use crate::settings::Expression;
-    use crate::test_utils;
+    use crate::settings::{test_utils, Expression};
 
     #[test]
     fn test_make_path_like_bus_name() {

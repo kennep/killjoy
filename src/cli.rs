@@ -1,10 +1,10 @@
-//! Logic for interacting with the CLI.
+// Logic for interacting with the CLI.
 
 use clap;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use regex::Regex;
 
-/// Consume CLI arguments, parse them, validate them, and return the digested result.
+// Consume CLI arguments, parse them, validate them, and return the digested result.
 pub fn get_cli_args<'a>() -> ArgMatches<'a> {
     let help_messages = HelpMessagesFactory::new().gen_help_messages();
     App::new("killjoy")
