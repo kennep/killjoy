@@ -91,7 +91,7 @@ fn handle_settings_load_path_subcommand() {
             process::exit(1);
         }
     };
-    println!("{:?}", load_path);
+    println!("{}", load_path.as_path().display());
 }
 
 // Handle the 'settings validate' subcommand.
