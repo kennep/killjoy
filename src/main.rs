@@ -55,6 +55,7 @@ mod generated;
 mod settings;
 mod unit;
 
+use std::path::Path;
 use std::process;
 use std::thread;
 
@@ -90,12 +91,16 @@ fn handle_settings_load_path_subcommand() {
             process::exit(1);
         }
     };
-    println!("{}", load_path);
+    println!("{:?}", load_path);
 }
 
 // Handle the 'settings validate' subcommand.
 fn handle_settings_validate_subcommand(args: &ArgMatches) {
-    get_settings_or_exit(args.value_of("path"));
+    let path = match args.value_of("path") {
+        Some(path_str) => Some(Path::new(path_str)),
+        None => None,
+    };
+    get_settings_or_exit(path);
 }
 
 // Handle no subcommand at all.
@@ -118,7 +123,7 @@ fn handle_no_subcommand() {
 }
 
 // Get and return a settings object, or print a message to stderr and exit with a non-zero code.
-fn get_settings_or_exit(path: Option<&str>) -> Settings {
+fn get_settings_or_exit(path: Option<&Path>) -> Settings {
     match settings::load(path) {
         Ok(settings_obj) => settings_obj,
         Err(err) => {

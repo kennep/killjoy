@@ -5,12 +5,13 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::path::{Path, PathBuf};
 
 use dbus::{BusName, BusType};
 use serde::Deserialize;
 use xdg::BaseDirectories;
 
-use crate::error::{FindConfigFileError, ParseConfigFileError, ParsePathError};
+use crate::error::{FindConfigFileError, ParseConfigFileError};
 use crate::unit::ActiveState;
 
 // The expressions that a user may use to match unit names.
@@ -283,7 +284,7 @@ pub fn get_bus_types(rules: &[Rule]) -> Vec<BusType> {
 // Search several paths for a settings file, in order of preference.
 //
 // If a file is found, return its path. Otherwise, return an error describing why.
-pub fn get_load_path() -> Result<String, Box<dyn Error>> {
+pub fn get_load_path() -> Result<PathBuf, Box<dyn Error>> {
     let dirs = match BaseDirectories::with_prefix("killjoy") {
         Ok(dirs) => dirs,
         Err(err) => return Err(Box::new(err)),
@@ -292,11 +293,7 @@ pub fn get_load_path() -> Result<String, Box<dyn Error>> {
         Some(path_buf) => path_buf,
         None => return Err(Box::new(FindConfigFileError)),
     };
-    let path = match path_buf.to_str() {
-        Some(path) => path.to_string(),
-        None => return Err(Box::new(ParsePathError)),
-    };
-    Ok(path)
+    Ok(path_buf)
 }
 
 // Read the configuration file into a Settings object.
@@ -306,12 +303,12 @@ pub fn get_load_path() -> Result<String, Box<dyn Error>> {
 // *   The file couldn't be opened. Maybe a settings file couldn't be found; or maybe a settings
 //     file was found but could not be opened.
 // *   The file contained invalid contents. See [Settings::new](struct.Settings.html#method.new).
-pub fn load(path: Option<&str>) -> Result<Settings, Box<dyn Error>> {
-    let load_path = match path {
-        Some(path) => path.to_owned(),
-        None => get_load_path()?,
+pub fn load(path: Option<&Path>) -> Result<Settings, Box<dyn Error>> {
+    let handle_opt = match path {
+        Some(path) => File::open(path),
+        None => File::open(get_load_path()?.as_path()),
     };
-    let handle = match File::open(load_path) {
+    let handle = match handle_opt {
         Ok(handle) => handle,
         Err(err) => return Err(Box::new(err)),
     };

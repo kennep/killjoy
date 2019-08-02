@@ -42,17 +42,3 @@ impl Display for ParseConfigFileError {
 }
 
 impl Error for ParseConfigFileError {}
-
-// An error indicating that a file path could not be parsed.
-//
-// OS file paths are most commonly parsed as unicode.
-#[derive(Debug)]
-pub struct ParsePathError;
-
-impl Display for ParsePathError {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "Failed to convert file path to a unicode string.")
-    }
-}
-
-impl Error for ParsePathError {}
