@@ -224,6 +224,36 @@ struct SerdeSettings {
     rules: Vec<SerdeRule>,
 }
 
+// This struct is a hack. See get_bus_types().
+#[derive(PartialEq, Eq, Hash)]
+enum HashableBusType {
+    Session,
+    Starter,
+    System,
+}
+
+// This impl is a hack. See get_bus_types().
+impl From<BusType> for HashableBusType {
+    fn from(value: BusType) -> Self {
+        match value {
+            BusType::Session => HashableBusType::Session,
+            BusType::Starter => HashableBusType::Starter,
+            BusType::System => HashableBusType::System,
+        }
+    }
+}
+
+// This impl is a hack. See get_bus_types().
+impl Into<BusType> for HashableBusType {
+    fn into(self) -> BusType {
+        match self {
+            HashableBusType::Session => BusType::Session,
+            HashableBusType::Starter => BusType::Starter,
+            HashableBusType::System => BusType::System,
+        }
+    }
+}
+
 pub fn decode_bus_type_str(bus_type_str: &str) -> Result<BusType, String> {
     match bus_type_str {
         "session" => Ok(BusType::Session),
@@ -236,25 +266,17 @@ pub fn decode_bus_type_str(bus_type_str: &str) -> Result<BusType, String> {
     }
 }
 
-pub fn encode_bus_type(bus_type: BusType) -> String {
-    match bus_type {
-        BusType::Session => "session".to_string(),
-        BusType::Starter => "starter".to_string(),
-        BusType::System => "system".to_string(),
-    }
-}
-
 // Get a deduplicated list of D-Bus bus types in the given list of rules.
 pub fn get_bus_types(rules: &[Rule]) -> Vec<BusType> {
-    // The conversion from BusType → String → BusType is a hack. It's done because this method
-    // should deduplicate BusType values, but BusType doesn't implement the traits necessary to
-    // create a HashSet<BusType>.
+    // The conversion from BusType → HashableBusType → BusType is a hack. It's done because this
+    // method should deduplicate BusType values, but BusType doesn't implement the traits necessary
+    // to create a HashSet<BusType>.
     rules
         .iter()
-        .map(|rule: &Rule| encode_bus_type(rule.bus_type))
-        .collect::<HashSet<String>>()
+        .map(|rule: &Rule| HashableBusType::from(rule.bus_type))
+        .collect::<HashSet<HashableBusType>>()
         .into_iter()
-        .map(|bus_type_str: String| decode_bus_type_str(&bus_type_str[..]).unwrap())
+        .map(|hashable_bus_type: HashableBusType| hashable_bus_type.into())
         .collect()
 }
 
