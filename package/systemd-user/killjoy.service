@@ -1,0 +1,16 @@
+[Unit]
+Description=Monitor systemd units
+
+[Service]
+ExecStart=/usr/bin/killjoy
+
+# hardening
+LockPersonality=true
+MemoryDenyWriteExecute=true
+NoNewPrivileges=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=default.target
