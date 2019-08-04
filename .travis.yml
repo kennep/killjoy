@@ -28,5 +28,5 @@ before_script:
 script:
   - cargo check
   - cargo test
-  - cargo clippy
+  - cargo clippy -- --deny warnings  # treat warnings as errors
   - cargo fmt && git diff --exit-code
