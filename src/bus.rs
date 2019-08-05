@@ -213,15 +213,18 @@ impl BusWatcher {
                         &body_active_states,
                     );
 
-                    // A problem with merely send()ing a a message is that we have no idea if the
-                    // message got to its destination or not. If e.g. header_bus_name is incorrect,
-                    // we won't know.
-                    Connection::get_private(notifier.bus_type)
-                        .expect(
-                            &format!("Failed to connect to {:?} D-Bus bus.", notifier.bus_type)[..],
-                        )
-                        .send(msg)
-                        .unwrap();
+                    let conn = Connection::get_private(notifier.bus_type).expect(
+                        &format!("Failed to connect to {:?} D-Bus bus.", notifier.bus_type)[..],
+                    );
+                    match conn.send_with_reply_and_block(msg, 5000) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            eprintln!(
+                                "Error occurred when contacting notifier \"{}\": {}",
+                                notifier_name, err
+                            );
+                        }
+                    }
                 }
             }
         }
