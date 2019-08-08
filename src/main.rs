@@ -69,7 +69,11 @@ fn main() {
     let args = cli::get_cli_args();
     match args.subcommand() {
         ("settings", Some(sub_args)) => handle_settings_subcommand(&sub_args),
-        _ => handle_no_subcommand(),
+        _ => {
+            let loop_once = args.is_present("loop-once");
+            let loop_timeout = get_loop_timeout_or_exit(&args);
+            handle_no_subcommand(loop_once, loop_timeout);
+        }
     }
 }
 
@@ -108,14 +112,16 @@ fn handle_settings_validate_subcommand(args: &ArgMatches) {
 // For each unique D-Bus bus listed in the settings file, spawn a thread. Each thread connects to a
 // D-Bus bus, and talks to the instance of systemd available on that bus, and the notifiers
 // available on that bus.
-fn handle_no_subcommand() {
+fn handle_no_subcommand(loop_once: bool, loop_timeout: u32) {
     let mut exit_code = 0;
     let settings: Settings = get_settings_or_exit(None);
     let handles: Vec<_> = settings::get_bus_types(&settings.rules)
         .into_iter()
         .map(|bus_type| {
             let settings_clone = settings.clone();
-            thread::spawn(move || BusWatcher::new(bus_type, settings_clone).run())
+            thread::spawn(move || {
+                BusWatcher::new(bus_type, settings_clone, loop_once, loop_timeout).run()
+            })
         })
         .collect();
 
@@ -142,6 +148,22 @@ fn get_settings_or_exit(path: Option<&Path>) -> Settings {
         Ok(settings_obj) => settings_obj,
         Err(err) => {
             eprintln!("{}", err);
+            process::exit(1);
+        }
+    }
+}
+
+// Get the `loop-timeout` argument, or kill this process.
+fn get_loop_timeout_or_exit(args: &ArgMatches) -> u32 {
+    // It's safe to call expect(), because a default value is set in our arg parser.
+    let result = args
+        .value_of("loop-timeout")
+        .expect("Failed to get value of loop-timeout argument.")
+        .parse::<u32>();
+    match result {
+        Ok(val) => val,
+        Err(err) => {
+            eprintln!("Failed to parse argument loop-timeout: {}", err);
             process::exit(1);
         }
     }

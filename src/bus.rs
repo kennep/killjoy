@@ -26,6 +26,8 @@ const VERBOSE: bool = false;
 
 // Watch units appear and disappear on a bus, and take actions in response.
 pub struct BusWatcher {
+    loop_once: bool,
+    loop_timeout: u32,
     connection: Connection,
     settings: Settings,
 }
@@ -35,11 +37,13 @@ impl BusWatcher {
     //
     // To watch for units of interest, and to take action when those units of interest transition to
     // states of interest, call `run`.
-    pub fn new(bus_type: BusType, settings: Settings) -> Self {
+    pub fn new(bus_type: BusType, settings: Settings, loop_once: bool, loop_timeout: u32) -> Self {
         let connection = Connection::get_private(bus_type)
             .expect(&format!("Failed to connect to {:?} D-Bus bus.", bus_type)[..]);
         let settings = settings;
         BusWatcher {
+            loop_once,
+            loop_timeout,
             connection,
             settings,
         }
@@ -169,7 +173,7 @@ impl BusWatcher {
 
         // Infinitely process Unit{Removed,New} signals.
         loop {
-            for msg in self.connection.incoming(10000) {
+            for msg in self.connection.incoming(self.loop_timeout) {
                 if let Some(msg_body) = UnitNew::from_message(&msg) {
                     self.handle_unit_new(&msg_body, &mut unit_states);
                 } else if let Some(msg_body) = UnitRemoved::from_message(&msg) {
@@ -179,6 +183,9 @@ impl BusWatcher {
                 } else if VERBOSE {
                     eprintln!("Unexpected message received: {:?}", msg);
                 };
+            }
+            if self.loop_once {
+                return Ok(());
             }
         }
     }

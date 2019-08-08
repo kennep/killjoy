@@ -130,6 +130,40 @@ fn test_no_systemd() {
         .code(1);
 }
 
+// Call `killjoy`, and let the settings be invalid.
+#[test]
+fn test_run_settings_failure() {
+    let (config_dir, _settings_dir, mut settings_file) = create_config_skeleton();
+    write_invalid_settings(&mut settings_file);
+    let config_dir_str = path_to_str(&config_dir.path());
+    Command::cargo_bin("killjoy")
+        .expect("Failed to find crate-local executable.")
+        .env("XDG_CONFIG_HOME", config_dir_str)
+        .env("XDG_CONFIG_DIRS", config_dir_str)
+        .args(&["--loop-once", "--loop-timeout", "0"])
+        .output()
+        .expect("Failed to run killjoy")
+        .assert()
+        .code(1);
+}
+
+// Call `killjoy`, and let the settings be valid.
+#[test]
+fn test_run_settings_success() {
+    let (config_dir, _settings_dir, mut settings_file) = create_config_skeleton();
+    write_valid_settings(&mut settings_file);
+    let config_dir_str = path_to_str(&config_dir.path());
+    Command::cargo_bin("killjoy")
+        .expect("Failed to find crate-local executable.")
+        .env("XDG_CONFIG_HOME", config_dir_str)
+        .env("XDG_CONFIG_DIRS", config_dir_str)
+        .args(&["--loop-once", "--loop-timeout", "0"])
+        .output()
+        .expect("Failed to run killjoy")
+        .assert()
+        .code(0);
+}
+
 // Return the string representation of the given path.
 //
 // Panic if unable create a unicode representation of the path.

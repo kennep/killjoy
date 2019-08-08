@@ -12,6 +12,19 @@ pub fn get_cli_args<'a>() -> ArgMatches<'a> {
         .author("Jeremy Audet <jerebear@protonmail.com>")
         .about("Monitor systemd units.")
         .max_term_width(100)
+        .args(&[
+            Arg::with_name("loop-once")
+                .long("loop-once")
+                .takes_value(false)
+                .help("FOR DEVELOPMENT ONLY! Run the main loop just once.")
+                .hidden(true),
+            Arg::with_name("loop-timeout")
+                .long("loop-timeout")
+                .takes_value(true)
+                .default_value("10000")
+                .help("FOR DEVELOPMENT ONLY! The main loop message wait timeout, in ms.")
+                .hidden(true),
+        ])
         .subcommand(
             SubCommand::with_name("settings")
                 .about("Manage the settings file.")
