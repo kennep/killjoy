@@ -16,6 +16,7 @@ addons:
   apt:
     packages:
       - libdbus-1-dev
+      - shellcheck
 
 cache: cargo
 
@@ -26,6 +27,7 @@ before_script:
   - rustup component add rustfmt
 
 script:
+  - find scripts -type f -name '*.sh' -exec shellcheck '{}' ';'
   - cargo check
   - cargo test
   - cargo clippy -- --deny warnings  # treat warnings as errors
