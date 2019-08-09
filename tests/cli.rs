@@ -4,7 +4,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Command;
 
 use assert_cmd::cargo;
 use assert_cmd::prelude::{CommandCargoExt, OutputAssertExt};
@@ -19,14 +19,15 @@ fn test_settings_load_path_failure() {
     std::fs::rename(&old_config_file_path, &new_config_file_path)
         .expect("Failed to rename settings file.");
     let config_dir_str = path_to_str(&config_dir.path());
-    let out: Output = Command::cargo_bin("killjoy")
+    Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
         .env("XDG_CONFIG_HOME", config_dir_str)
         .env("XDG_CONFIG_DIRS", config_dir_str)
         .args(&["settings", "load-path"])
         .output()
-        .expect("Failed to run killjoy.");
-    out.assert().failure();
+        .expect("Failed to run killjoy.")
+        .assert()
+        .code(1);
 }
 
 // Call `killjoy settings load-path` and expect success.
@@ -34,14 +35,15 @@ fn test_settings_load_path_failure() {
 fn test_settings_load_path_success() {
     let (config_dir, _, _) = create_config_skeleton();
     let config_dir_str = path_to_str(&config_dir.path());
-    let out: Output = Command::cargo_bin("killjoy")
+    Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
         .env("XDG_CONFIG_HOME", config_dir_str)
         .env("XDG_CONFIG_DIRS", config_dir_str)
         .args(&["settings", "load-path"])
         .output()
-        .expect("Failed to run killjoy.");
-    out.assert().success();
+        .expect("Failed to run killjoy.")
+        .assert()
+        .code(0);
 }
 
 // Call `killjoy settings validate` and expect failure.
@@ -50,14 +52,15 @@ fn test_settings_validate_failure() {
     let (config_dir, _, mut settings_file) = create_config_skeleton();
     write_invalid_settings(&mut settings_file);
     let config_dir_str = path_to_str(&config_dir.path());
-    let out: Output = Command::cargo_bin("killjoy")
+    Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
         .env("XDG_CONFIG_HOME", config_dir_str)
         .env("XDG_CONFIG_DIRS", config_dir_str)
         .args(&["settings", "validate"])
         .output()
-        .expect("Failed to run killjoy.");
-    out.assert().failure();
+        .expect("Failed to run killjoy.")
+        .assert()
+        .code(1);
 }
 
 // Call `killjoy settings validate` and expect success.
@@ -66,14 +69,15 @@ fn test_settings_validate_success() {
     let (config_dir, _, mut settings_file) = create_config_skeleton();
     write_valid_settings(&mut settings_file);
     let config_dir_str = path_to_str(&config_dir.path());
-    let out: Output = Command::cargo_bin("killjoy")
+    Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
         .env("XDG_CONFIG_HOME", config_dir_str)
         .env("XDG_CONFIG_DIRS", config_dir_str)
         .args(&["settings", "validate"])
         .output()
-        .expect("Failed to run killjoy.");
-    out.assert().success();
+        .expect("Failed to run killjoy.")
+        .assert()
+        .code(0);
 }
 
 // Call `killjoy settings validate $path` and expect failure.
@@ -82,12 +86,13 @@ fn test_settings_validate_path_failure() {
     let mut settings_file = NamedTempFile::new().expect("Failed to create a named temporary file.");
     write_invalid_settings(&mut settings_file);
 
-    let out: Output = Command::cargo_bin("killjoy")
+    Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
         .args(&["settings", "validate", path_to_str(&settings_file.path())])
         .output()
-        .expect("Failed to run killjoy.");
-    out.assert().failure();
+        .expect("Failed to run killjoy.")
+        .assert()
+        .code(1);
 }
 
 // Call `killjoy settings validate $path` and expect success.
@@ -95,13 +100,13 @@ fn test_settings_validate_path_failure() {
 fn test_settings_validate_path_success() {
     let mut settings_file = NamedTempFile::new().expect("Failed to create a named temporary file.");
     write_valid_settings(&mut settings_file);
-
-    let out: Output = Command::cargo_bin("killjoy")
+    Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
         .args(&["settings", "validate", path_to_str(&settings_file.path())])
         .output()
-        .expect("Failed to run killjoy.");
-    out.assert().success();
+        .expect("Failed to run killjoy.")
+        .assert()
+        .code(0);
 }
 
 // Prevent killjoy's worker threads from contacting systemd.
