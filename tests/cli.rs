@@ -17,7 +17,7 @@ fn test_settings_load_path_failure() {
     let new_config_file_path = settings_dir.join("foo.json");
     std::fs::rename(&old_config_file_path, &new_config_file_path)
         .expect("Failed to rename settings file.");
-    let config_dir_str = to_config_dir_str(&config_dir);
+    let config_dir_str = path_to_str(&config_dir.path());
     let out: Output = Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
         .env("XDG_CONFIG_HOME", config_dir_str)
@@ -32,7 +32,7 @@ fn test_settings_load_path_failure() {
 #[test]
 fn test_settings_load_path_success() {
     let (config_dir, _, _) = create_config_skeleton();
-    let config_dir_str = to_config_dir_str(&config_dir);
+    let config_dir_str = path_to_str(&config_dir.path());
     let out: Output = Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
         .env("XDG_CONFIG_HOME", config_dir_str)
@@ -48,7 +48,7 @@ fn test_settings_load_path_success() {
 fn test_settings_validate_failure() {
     let (config_dir, _, mut settings_file) = create_config_skeleton();
     write_invalid_settings(&mut settings_file);
-    let config_dir_str = to_config_dir_str(&config_dir);
+    let config_dir_str = path_to_str(&config_dir.path());
     let out: Output = Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
         .env("XDG_CONFIG_HOME", config_dir_str)
@@ -64,7 +64,7 @@ fn test_settings_validate_failure() {
 fn test_settings_validate_success() {
     let (config_dir, _, mut settings_file) = create_config_skeleton();
     write_valid_settings(&mut settings_file);
-    let config_dir_str = to_config_dir_str(&config_dir);
+    let config_dir_str = path_to_str(&config_dir.path());
     let out: Output = Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
         .env("XDG_CONFIG_HOME", config_dir_str)
@@ -83,14 +83,7 @@ fn test_settings_validate_path_failure() {
 
     let out: Output = Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
-        .args(&[
-            "settings",
-            "validate",
-            settings_file
-                .path()
-                .to_str()
-                .expect("Failed to convert file path to unicode string."),
-        ])
+        .args(&["settings", "validate", path_to_str(&settings_file.path())])
         .output()
         .expect("Failed to run killjoy.");
     out.assert().failure();
@@ -104,27 +97,18 @@ fn test_settings_validate_path_success() {
 
     let out: Output = Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
-        .args(&[
-            "settings",
-            "validate",
-            settings_file
-                .path()
-                .to_str()
-                .expect("Failed to convert file path to unicode string."),
-        ])
+        .args(&["settings", "validate", path_to_str(&settings_file.path())])
         .output()
         .expect("Failed to run killjoy.");
     out.assert().success();
 }
 
-// Return the string representation of the given temp dir.
+// Return the string representation of the given path.
 //
-// Panics if unable create a unicode representation of the temp dir path.
-fn to_config_dir_str(config_dir: &TempDir) -> &str {
-    config_dir
-        .path()
-        .to_str()
-        .expect("Failed to convert file path to unicode string.")
+// Panic if unable create a unicode representation of the path.
+fn path_to_str(path: &Path) -> &str {
+    path.to_str()
+        .expect("Failed to convert path to unicode string.")
 }
 
 // Create a temporary directory containing "killjoy/settings.json".
