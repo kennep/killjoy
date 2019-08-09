@@ -146,7 +146,17 @@ impl BusWatcher {
 
         // Review extant units, and act on interesting ones.
         let mut unit_states: HashMap<String, UnitStateMachine> = HashMap::new();
-        self.get_unit_names()
+        let unit_names = match self.get_unit_names() {
+            Ok(unit_names) => unit_names,
+            Err(err) => {
+                eprintln!(
+                    "Monitoring thread for bus {} failed to get list of unit names. Exiting. Underlying error: {}",
+                    self.connection.unique_name(), err
+                );
+                return Err(1);
+            }
+        };
+        unit_names
             .iter()
             .filter(|unit_name: &&String| {
                 let borrowed_rules: Vec<&Rule> = self.settings.rules.iter().collect();
@@ -259,13 +269,13 @@ impl BusWatcher {
     }
 
     // Get the name of every loaded unit.
-    fn get_unit_names(&self) -> Vec<String> {
-        self.get_conn_path(&wrap_path_for_systemd())
-            .list_units()
-            .unwrap()
+    fn get_unit_names(&self) -> Result<Vec<String>, Error> {
+        Ok(self
+            .get_conn_path(&wrap_path_for_systemd())
+            .list_units()?
             .into_iter()
             .map(|unit| unit.0)
-            .collect()
+            .collect())
     }
 
     // Handle the UnitNew signal.
