@@ -109,6 +109,7 @@ fn handle_settings_validate_subcommand(args: &ArgMatches) {
 // D-Bus bus, and talks to the instance of systemd available on that bus, and the notifiers
 // available on that bus.
 fn handle_no_subcommand() {
+    let mut exit_code = 0;
     let settings: Settings = get_settings_or_exit(None);
     let handles: Vec<_> = settings::get_bus_types(&settings.rules)
         .into_iter()
@@ -118,8 +119,19 @@ fn handle_no_subcommand() {
         })
         .collect();
     for handle in handles {
-        handle.join().unwrap();
+        match handle.join() {
+            Err(err) => {
+                eprintln!("Monitoring thread panicked. Error: {:?}", err);
+            }
+            Ok(result) => {
+                if let Err(code) = result {
+                    eprintln!("Monitoring thread exited with code {}.", code);
+                    exit_code = code;
+                }
+            }
+        }
     }
+    process::exit(exit_code);
 }
 
 // Get and return a settings object, or print a message to stderr and exit with a non-zero code.

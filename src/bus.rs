@@ -124,8 +124,14 @@ impl BusWatcher {
     // Startup is complete when all unicast messages requesting unit states have been received a
     // response and been processed. After that point, all `PropertiesChanged` signals are either
     // out-of-date and discarded, or newer and useful.
-    pub fn run(&self) {
-        self.enable_systemd_signals();
+    pub fn run(&self) -> Result<(), i32> {
+        if let Err(err) = self.enable_systemd_signals() {
+            eprintln!(
+                "Failed to subscribe to systemd signals on {:?}. Detailed error: {}",
+                self.connection, err
+            );
+            return Err(1);
+        }
 
         // D-Bus inserts a org.freedesktop.DBus.NameAcquired signal into the message queue of new
         // connections. Discard it before subscribing to Unit{Removed,New}.
@@ -162,10 +168,12 @@ impl BusWatcher {
     }
 
     // By default, org.freedesktop.systemd will suppress most signals. Enable them.
-    fn enable_systemd_signals(&self) {
-        self.get_conn_path(&wrap_path_for_systemd())
-            .subscribe()
-            .unwrap();
+    fn enable_systemd_signals(&self) -> Result<(), Error> {
+        if let Err(err) = self.get_conn_path(&wrap_path_for_systemd()).subscribe() {
+            Err(err)
+        } else {
+            Ok(())
+        }
     }
 
     // Delete the given unit's state from `unit_states`, if present.

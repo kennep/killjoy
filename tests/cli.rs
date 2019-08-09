@@ -6,6 +6,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+use assert_cmd::cargo;
 use assert_cmd::prelude::{CommandCargoExt, OutputAssertExt};
 use tempfile::{NamedTempFile, TempDir};
 
@@ -101,6 +102,27 @@ fn test_settings_validate_path_success() {
         .output()
         .expect("Failed to run killjoy.");
     out.assert().success();
+}
+
+// Prevent killjoy's worker threads from contacting systemd.
+//
+// This test makes that happen by starting a temporary stand-alone session D-Bus instance, where
+// killjoy is the only peer.
+#[test]
+fn test_no_systemd() {
+    let (config_dir, _settings_dir, mut settings_file) = create_config_skeleton();
+    write_valid_settings(&mut settings_file);
+
+    // Exit code is 101 for panic.
+    let config_dir_str = path_to_str(&config_dir.path());
+    Command::new("dbus-run-session")
+        .env("XDG_CONFIG_HOME", config_dir_str)
+        .env("XDG_CONFIG_DIRS", config_dir_str)
+        .args(&["--", path_to_str(cargo::cargo_bin("killjoy").as_path())])
+        .output()
+        .expect("failed to run executable")
+        .assert()
+        .code(1);
 }
 
 // Return the string representation of the given path.
