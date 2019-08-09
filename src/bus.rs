@@ -134,9 +134,15 @@ impl BusWatcher {
         }
 
         // D-Bus inserts a org.freedesktop.DBus.NameAcquired signal into the message queue of new
-        // connections. Discard it before subscribing to Unit{Removed,New}.
+        // connections. Discard it before subscribing to any other signals.
         self.connection.incoming(1000).next();
-        self.subscribe_unit_presence();
+        if let Err(err) = self.subscribe_unit_presence() {
+            eprintln!(
+                "Monitoring thread for bus {} failed to subscribe to Unit{{Removed,New}} signals. Exiting. Underlying error: {}",
+                self.connection.unique_name(), err
+            );
+            return Err(1);
+        }
 
         // Review extant units, and act on interesting ones.
         let mut unit_states: HashMap<String, UnitStateMachine> = HashMap::new();
@@ -414,8 +420,8 @@ impl BusWatcher {
 
     // Subscribe to the `UnitRemoved` and `UnitNew` signals, in that order.
     //
-    // These signals are emitted by
-    // [`org.freedesktop.systemd1.Manager`](https://www.freedesktop.org/wiki/Software/systemd/dbus/).
+    // These signals are emitted by `org.freedesktop.systemd1.Manager`. See:
+    // https://www.freedesktop.org/wiki/Software/systemd/dbus/
     //
     // It's *VERY* important that one subscribe to UnitRemoved before UnitNew. Doing so prevents the
     // following scenario:
@@ -427,16 +433,14 @@ impl BusWatcher {
     //
     // In this scenario, killjoy would consume the announcements queued up at the connection, and
     // incorrectly conclude that foo.unittype is present.
-    fn subscribe_unit_presence(&self) {
+    fn subscribe_unit_presence(&self) -> Result<(), Error> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = wrap_path_for_systemd();
-        let match_strs: Vec<String> = vec![
-            UnitRemoved::match_str(Some(&bus_name), Some(&path)),
-            UnitNew::match_str(Some(&bus_name), Some(&path)),
-        ];
-        match_strs
-            .iter()
-            .for_each(|match_str| self.connection.add_match(match_str).unwrap());
+        self.connection
+            .add_match(&UnitRemoved::match_str(Some(&bus_name), Some(&path)))?;
+        self.connection
+            .add_match(&UnitNew::match_str(Some(&bus_name), Some(&path)))?;
+        Ok(())
     }
 
     // Subscribe to the `PropertiesChanged` signal for the given unit.
