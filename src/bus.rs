@@ -127,8 +127,8 @@ impl BusWatcher {
     pub fn run(&self) -> Result<(), i32> {
         if let Err(err) = self.enable_systemd_signals() {
             eprintln!(
-                "Failed to subscribe to systemd signals on {:?}. Detailed error: {}",
-                self.connection, err
+                "Monitoring thread for bus {} failed to subscribe to systemd signals. Exiting. Underlying error: {}",
+                self.connection.unique_name(), err
             );
             return Err(1);
         }

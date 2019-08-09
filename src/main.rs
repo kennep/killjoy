@@ -118,14 +118,16 @@ fn handle_no_subcommand() {
             thread::spawn(move || BusWatcher::new(bus_type, settings_clone).run())
         })
         .collect();
+
+    // Handles are joined in the order they appear in the vector, not the order in which they exit,
+    // meaning that there may be a long delay between an error occurring and this main thread
+    // learning about it. Consequently, the monitoring threads should print their own error messages
+    // whenever possible.
     for handle in handles {
         match handle.join() {
-            Err(err) => {
-                eprintln!("Monitoring thread panicked. Error: {:?}", err);
-            }
+            Err(err) => eprintln!("Monitoring thread panicked. Error: {:?}", err),
             Ok(result) => {
                 if let Err(code) = result {
-                    eprintln!("Monitoring thread exited with code {}.", code);
                     exit_code = code;
                 }
             }
