@@ -169,7 +169,7 @@ impl BusWatcher {
 
         // Review extant units, and act on interesting ones.
         let mut unit_states: HashMap<String, UnitStateMachine> = HashMap::new();
-        let unit_names = match self.get_unit_names() {
+        let unit_names = match self.call_manager_list_units() {
             Ok(unit_names) => unit_names,
             Err(err) => {
                 eprintln!(
@@ -292,8 +292,10 @@ impl BusWatcher {
         }
     }
 
-    // Get the name of every loaded unit.
-    fn get_unit_names(&self) -> Result<Vec<String>, DBusError> {
+    // Call `org.freedesktop.systemd1.Manager.ListUnits`.
+    //
+    // This method "returns an array with all currently loaded units."
+    fn call_manager_list_units(&self) -> Result<Vec<String>, DBusError> {
         Ok(self
             .get_conn_path(&wrap_path_for_systemd())
             .list_units()?
