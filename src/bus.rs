@@ -130,7 +130,7 @@ impl BusWatcher {
     // response and been processed. After that point, all `PropertiesChanged` signals are either
     // out-of-date and discarded, or newer and useful.
     pub fn run(&self) -> Result<(), i32> {
-        if let Err(err) = self.enable_systemd_signals() {
+        if let Err(err) = self.call_manager_subscribe() {
             eprintln!(
                 "Monitoring thread for bus {} failed to subscribe to systemd signals. Exiting. Underlying error: {}",
                 self.connection.unique_name(), err
@@ -209,8 +209,10 @@ impl BusWatcher {
         }
     }
 
-    // By default, org.freedesktop.systemd will suppress most signals. Enable them.
-    fn enable_systemd_signals(&self) -> Result<(), DBusError> {
+    // Call `org.freedesktop.systemd1.Manager.Subscribe`.
+    //
+    // By default, the manager will *not* emit most signals. Enable them.
+    fn call_manager_subscribe(&self) -> Result<(), DBusError> {
         self.get_conn_path(&wrap_path_for_systemd()).subscribe()
     }
 
