@@ -141,9 +141,27 @@ impl BusWatcher {
         // D-Bus inserts a org.freedesktop.DBus.NameAcquired signal into the message queue of new
         // connections. Discard it before subscribing to any other signals.
         self.connection.incoming(1000).next();
-        if let Err(err) = self.subscribe_unit_presence() {
+
+        // It's important to subscribe to UnitRemoved before UnitNew. Doing so prevents the
+        // following scenario:
+        //
+        // 1.   A connection is subscribed to UnitNew announcements.
+        // 2.   Systemd announces UnitNew for foo.unittype, which the connection receives.
+        // 3.   Systemd announces UnitRemoved for foo.unittype, which the connection misses.
+        // 4.   A connection is subscribed to UnitRemoved announcements.
+        //
+        // In this scenario, killjoy would consume the announcements queued up at the connection,
+        // and incorrectly conclude that foo.unittype is present.
+        if let Err(err) = self.subscribe_manager_unit_removed() {
             eprintln!(
-                "Monitoring thread for bus {} failed to subscribe to Unit{{Removed,New}} signals. Exiting. Underlying error: {}",
+                "Monitoring thread for bus {} failed to subscribe to the UnitRemoved signal. Exiting. Underlying error: {}",
+                self.connection.unique_name(), err
+            );
+            return Err(1);
+        }
+        if let Err(err) = self.subscribe_manager_unit_new() {
+            eprintln!(
+                "Monitoring thread for bus {} failed to subscribe to the UnitNew signal. Exiting. Underlying error: {}",
                 self.connection.unique_name(), err
             );
             return Err(1);
@@ -432,29 +450,20 @@ impl BusWatcher {
         }
     }
 
-    // Subscribe to the `UnitRemoved` and `UnitNew` signals, in that order.
-    //
-    // These signals are emitted by `org.freedesktop.systemd1.Manager`. See:
-    // https://www.freedesktop.org/wiki/Software/systemd/dbus/
-    //
-    // It's *VERY* important that one subscribe to UnitRemoved before UnitNew. Doing so prevents the
-    // following scenario:
-    //
-    // 1.   A connection is subscribed to UnitNew announcements.
-    // 2.   Systemd announces UnitNew for foo.unittype, which the connection receives.
-    // 3.   Systemd announces UnitRemoved for foo.unittype, which the connection misses.
-    // 4.   A connection is subscribed to UnitRemoved announcements.
-    //
-    // In this scenario, killjoy would consume the announcements queued up at the connection, and
-    // incorrectly conclude that foo.unittype is present.
-    fn subscribe_unit_presence(&self) -> Result<(), DBusError> {
+    // Subscribe to the `org.freedesktop.systemd1.Manager.UnitNew` signal.
+    fn subscribe_manager_unit_new(&self) -> Result<(), DBusError> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = wrap_path_for_systemd();
         self.connection
-            .add_match(&UnitRemoved::match_str(Some(&bus_name), Some(&path)))?;
+            .add_match(&UnitNew::match_str(Some(&bus_name), Some(&path)))
+    }
+
+    // Subscribe to the `org.freedesktop.systemd1.Manager.UnitRemoved` signal.
+    fn subscribe_manager_unit_removed(&self) -> Result<(), DBusError> {
+        let bus_name = wrap_bus_name_for_systemd();
+        let path = wrap_path_for_systemd();
         self.connection
-            .add_match(&UnitNew::match_str(Some(&bus_name), Some(&path)))?;
-        Ok(())
+            .add_match(&UnitRemoved::match_str(Some(&bus_name), Some(&path)))
     }
 
     // Subscribe to the `PropertiesChanged` signal for the given unit.
