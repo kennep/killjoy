@@ -9,6 +9,7 @@ use dbus::{
     SignalArgs,
 };
 
+use crate::error::MyDBusError;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusProperties;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusPropertiesPropertiesChanged as PropertiesChanged;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1Manager;
@@ -125,14 +126,8 @@ impl BusWatcher {
     // Startup is complete when all unicast messages requesting unit states have been received a
     // response and been processed. After that point, all `PropertiesChanged` signals are either
     // out-of-date and discarded, or newer and useful.
-    pub fn run(&self) -> Result<(), i32> {
-        if let Err(err) = self.call_manager_subscribe() {
-            eprintln!(
-                "Monitoring thread for bus {} failed to subscribe to systemd signals. Exiting. Underlying error: {}",
-                self.connection.unique_name(), err
-            );
-            return Err(1);
-        }
+    pub fn run(&self) -> Result<(), MyDBusError> {
+        self.call_manager_subscribe()?;
 
         // D-Bus inserts a org.freedesktop.DBus.NameAcquired signal into the message queue of new
         // connections. Discard it before subscribing to any other signals.
@@ -148,33 +143,12 @@ impl BusWatcher {
         //
         // In this scenario, killjoy would consume the announcements queued up at the connection,
         // and incorrectly conclude that foo.unittype is present.
-        if let Err(err) = self.subscribe_manager_unit_removed() {
-            eprintln!(
-                "Monitoring thread for bus {} failed to subscribe to the UnitRemoved signal. Exiting. Underlying error: {}",
-                self.connection.unique_name(), err
-            );
-            return Err(1);
-        }
-        if let Err(err) = self.subscribe_manager_unit_new() {
-            eprintln!(
-                "Monitoring thread for bus {} failed to subscribe to the UnitNew signal. Exiting. Underlying error: {}",
-                self.connection.unique_name(), err
-            );
-            return Err(1);
-        }
+        self.subscribe_manager_unit_removed()?;
+        self.subscribe_manager_unit_new()?;
 
         // Review extant units, and act on interesting ones.
         let mut unit_states: HashMap<String, UnitStateMachine> = HashMap::new();
-        let unit_names = match self.call_manager_list_units() {
-            Ok(unit_names) => unit_names,
-            Err(err) => {
-                eprintln!(
-                    "Monitoring thread for bus {} failed to get list of unit names. Exiting. Underlying error: {}",
-                    self.connection.unique_name(), err
-                );
-                return Err(1);
-            }
-        };
+        let unit_names = self.call_manager_list_units()?;
         unit_names
             .iter()
             .filter(|unit_name: &&String| {
@@ -208,8 +182,18 @@ impl BusWatcher {
     // Call `org.freedesktop.systemd1.Manager.Subscribe`.
     //
     // By default, the manager will *not* emit most signals. Enable them.
-    fn call_manager_subscribe(&self) -> Result<(), DBusError> {
-        self.get_conn_path(&wrap_path_for_systemd()).subscribe()
+    fn call_manager_subscribe(&self) -> Result<(), MyDBusError> {
+        match self.get_conn_path(&wrap_path_for_systemd()).subscribe() {
+            Ok(_) => Ok(()),
+            Err(dbus_err) => {
+                let my_dbus_err = MyDBusError::new(format!(
+                    "Failed to call org.freedesktop.systemd1.Manager.Subscribe. Cause: {}",
+                    dbus_err
+                ));
+                eprintln!("{}", my_dbus_err);
+                Err(my_dbus_err)
+            }
+        }
     }
 
     // Delete the given unit's state from `unit_states`, if present.
@@ -291,13 +275,18 @@ impl BusWatcher {
     // Call `org.freedesktop.systemd1.Manager.ListUnits`.
     //
     // This method "returns an array with all currently loaded units."
-    fn call_manager_list_units(&self) -> Result<Vec<String>, DBusError> {
-        Ok(self
-            .get_conn_path(&wrap_path_for_systemd())
-            .list_units()?
-            .into_iter()
-            .map(|unit| unit.0)
-            .collect())
+    fn call_manager_list_units(&self) -> Result<Vec<String>, MyDBusError> {
+        match self.get_conn_path(&wrap_path_for_systemd()).list_units() {
+            Ok(units) => Ok(units.into_iter().map(|unit| unit.0).collect()),
+            Err(dbus_err) => {
+                let my_dbus_err = MyDBusError::new(format!(
+                    "Failed to call org.freedesktop.systemd1.Manager.ListUnits. Cause: {}",
+                    dbus_err
+                ));
+                eprintln!("{}", my_dbus_err);
+                Err(my_dbus_err)
+            }
+        }
     }
 
     // Handle the UnitNew signal.
@@ -447,19 +436,43 @@ impl BusWatcher {
     }
 
     // Subscribe to the `org.freedesktop.systemd1.Manager.UnitNew` signal.
-    fn subscribe_manager_unit_new(&self) -> Result<(), DBusError> {
+    fn subscribe_manager_unit_new(&self) -> Result<(), MyDBusError> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = wrap_path_for_systemd();
-        self.connection
+        match self
+            .connection
             .add_match(&UnitNew::match_str(Some(&bus_name), Some(&path)))
+        {
+            Ok(_) => Ok(()),
+            Err(dbus_err) => {
+                let my_dbus_err = MyDBusError::new(format!(
+                    "Failed to subscribe to org.freedesktop.systemd1.Manager.UnitNew. Cause: {}",
+                    dbus_err
+                ));
+                eprintln!("{}", my_dbus_err);
+                Err(my_dbus_err)
+            }
+        }
     }
 
     // Subscribe to the `org.freedesktop.systemd1.Manager.UnitRemoved` signal.
-    fn subscribe_manager_unit_removed(&self) -> Result<(), DBusError> {
+    fn subscribe_manager_unit_removed(&self) -> Result<(), MyDBusError> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = wrap_path_for_systemd();
-        self.connection
+        match self
+            .connection
             .add_match(&UnitRemoved::match_str(Some(&bus_name), Some(&path)))
+        {
+            Ok(_) => Ok(()),
+            Err(dbus_err) => {
+                let my_dbus_err = MyDBusError::new(format!(
+                    "Failed to subscribe to org.freedesktop.systemd1.Manager.UnitRemoved. Cause: {}",
+                    dbus_err
+                ));
+                eprintln!("{}", my_dbus_err);
+                Err(my_dbus_err)
+            }
+        }
     }
 
     // Subscribe to the `PropertiesChanged` signal for the given unit.

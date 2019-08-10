@@ -133,8 +133,8 @@ fn handle_no_subcommand(loop_once: bool, loop_timeout: u32) {
         match handle.join() {
             Err(err) => eprintln!("Monitoring thread panicked. Error: {:?}", err),
             Ok(result) => {
-                if let Err(code) = result {
-                    exit_code = code;
+                if result.is_err() {
+                    exit_code = 1;
                 }
             }
         }

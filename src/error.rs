@@ -42,3 +42,28 @@ impl Display for ParseConfigFileError {
 }
 
 impl Error for ParseConfigFileError {}
+
+// Like dbus::Error, but implements Send.
+//
+// This isn't a great way to handle errors. Doing this means that we don't know what went wrong,
+// except by inspecting the `msg` field. It would be nicer if e.g. we had an enum with variants like
+// ManagerUnitNew, ManagerUnitRemoved, etc, so that the type system could communicate what went
+// wrong.
+#[derive(Debug)]
+pub struct MyDBusError {
+    pub msg: String,
+}
+
+impl MyDBusError {
+    pub fn new(msg: String) -> Self {
+        Self { msg }
+    }
+}
+
+impl Display for MyDBusError {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "{}", self.msg)
+    }
+}
+
+impl Error for MyDBusError {}
