@@ -5,7 +5,8 @@ use std::convert::TryFrom;
 
 use dbus::arg::Variant;
 use dbus::{
-    BusName, BusType, ConnPath, Connection, Error, Interface, Member, Message, Path, SignalArgs,
+    BusName, BusType, ConnPath, Connection, Error as DBusError, Interface, Member, Message, Path,
+    SignalArgs,
 };
 
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusProperties;
@@ -191,7 +192,7 @@ impl BusWatcher {
     }
 
     // By default, org.freedesktop.systemd will suppress most signals. Enable them.
-    fn enable_systemd_signals(&self) -> Result<(), Error> {
+    fn enable_systemd_signals(&self) -> Result<(), DBusError> {
         self.get_conn_path(&wrap_path_for_systemd()).subscribe()
     }
 
@@ -272,7 +273,7 @@ impl BusWatcher {
     }
 
     // Get the name of every loaded unit.
-    fn get_unit_names(&self) -> Result<Vec<String>, Error> {
+    fn get_unit_names(&self) -> Result<Vec<String>, DBusError> {
         Ok(self
             .get_conn_path(&wrap_path_for_systemd())
             .list_units()?
@@ -392,7 +393,7 @@ impl BusWatcher {
         &self,
         unit_name: &str,
         unit_states: &mut HashMap<String, UnitStateMachine>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), DBusError> {
         // Get unit properties.
         let path: Path = self
             .get_conn_path(&wrap_path_for_systemd())
@@ -446,7 +447,7 @@ impl BusWatcher {
     //
     // In this scenario, killjoy would consume the announcements queued up at the connection, and
     // incorrectly conclude that foo.unittype is present.
-    fn subscribe_unit_presence(&self) -> Result<(), Error> {
+    fn subscribe_unit_presence(&self) -> Result<(), DBusError> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = wrap_path_for_systemd();
         self.connection
@@ -457,7 +458,7 @@ impl BusWatcher {
     }
 
     // Subscribe to the `PropertiesChanged` signal for the given unit.
-    fn subscribe_properties_changed(&self, unit_name: &str) -> Result<(), Error> {
+    fn subscribe_properties_changed(&self, unit_name: &str) -> Result<(), DBusError> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = self
             .get_conn_path(&wrap_path_for_systemd())
@@ -477,7 +478,7 @@ impl BusWatcher {
         }
     }
 
-    fn unsubscribe_properties_changed(&self, unit_name: &str) -> Result<(), Error> {
+    fn unsubscribe_properties_changed(&self, unit_name: &str) -> Result<(), DBusError> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = self
             .get_conn_path(&wrap_path_for_systemd())
