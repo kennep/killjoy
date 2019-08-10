@@ -21,10 +21,6 @@ const BUS_NAME_FOR_SYSTEMD: &str = "org.freedesktop.systemd1";
 const PATH_FOR_SYSTEMD: &str = "/org/freedesktop/systemd1";
 const INTERFACE_FOR_SYSTEMD_UNIT: &str = "org.freedesktop.systemd1.Unit";
 
-// How verbose should error messages be? This is a kludge, and should be replaced with proper
-// logging infrastructure.
-const VERBOSE: bool = false;
-
 // Watch units appear and disappear on a bus, and take actions in response.
 pub struct BusWatcher {
     loop_once: bool,
@@ -199,7 +195,7 @@ impl BusWatcher {
                     self.handle_unit_removed(&msg_body, &mut unit_states);
                 } else if let Some(msg_body) = PropertiesChanged::from_message(&msg) {
                     self.handle_properties_changed(&msg, &msg_body, &mut unit_states);
-                } else if VERBOSE {
+                } else {
                     eprintln!("Unexpected message received: {:?}", msg);
                 };
             }
@@ -382,12 +378,10 @@ impl BusWatcher {
         let unit_name: String = match unit_id_result {
             Ok(unit_id_variant) => unit_id_variant.0.as_str().unwrap().to_string(),
             Err(err) => {
-                if VERBOSE {
-                    eprintln!(
-                        "Failed to get unit name for {:?}. State change may have been missed. Error: {}",
-                        msg_path, err
-                    );
-                }
+                eprintln!(
+                    "Failed to get unit name for {:?}. State change may have been missed. Error: {}",
+                    msg_path, err
+                );
                 return;
             }
         };
@@ -448,9 +442,7 @@ impl BusWatcher {
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) {
         if let Err(err) = self.learn_unit_state(&unit_name, unit_states) {
-            if VERBOSE {
-                eprintln!("Failed to learn ActiveState for {}: {}", unit_name, err)
-            }
+            eprintln!("Failed to learn ActiveState for {}: {}", unit_name, err)
         }
     }
 
@@ -482,12 +474,10 @@ impl BusWatcher {
 
     fn subscribe_properties_changed_or_suppress(&self, unit_name: &str) {
         if let Err(err) = self.subscribe_properties_changed(&unit_name) {
-            if VERBOSE {
-                eprintln!(
-                    "Failed to subscribe to PropertiesChanged for {}: {}",
-                    unit_name, err
-                );
-            }
+            eprintln!(
+                "Failed to subscribe to PropertiesChanged for {}: {}",
+                unit_name, err
+            );
         }
     }
 
@@ -502,12 +492,10 @@ impl BusWatcher {
 
     fn unsubscribe_properties_changed_or_suppress(&self, unit_name: &str) {
         if let Err(err) = self.unsubscribe_properties_changed(&unit_name) {
-            if VERBOSE {
-                eprintln!(
-                    "Failed to unsubscribe from PropertiesChanged for {}: {}",
-                    unit_name, err
-                );
-            }
+            eprintln!(
+                "Failed to unsubscribe from PropertiesChanged for {}: {}",
+                unit_name, err
+            );
         }
     }
 }
