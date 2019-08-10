@@ -185,11 +185,7 @@ impl BusWatcher {
 
     // By default, org.freedesktop.systemd will suppress most signals. Enable them.
     fn enable_systemd_signals(&self) -> Result<(), Error> {
-        if let Err(err) = self.get_conn_path(&wrap_path_for_systemd()).subscribe() {
-            Err(err)
-        } else {
-            Ok(())
-        }
+        self.get_conn_path(&wrap_path_for_systemd()).subscribe()
     }
 
     // Delete the given unit's state from `unit_states`, if present.
@@ -460,8 +456,7 @@ impl BusWatcher {
             .get_conn_path(&wrap_path_for_systemd())
             .get_unit(unit_name)?;
         let match_str = &PropertiesChanged::match_str(Some(&bus_name), Some(&path));
-        self.connection.add_match(&match_str)?;
-        Ok(())
+        self.connection.add_match(&match_str)
     }
 
     fn subscribe_properties_changed_or_suppress(&self, unit_name: &str) {
@@ -481,8 +476,7 @@ impl BusWatcher {
             .get_conn_path(&wrap_path_for_systemd())
             .get_unit(unit_name)?;
         let match_str = &PropertiesChanged::match_str(Some(&bus_name), Some(&path));
-        self.connection.remove_match(&match_str)?;
-        Ok(())
+        self.connection.remove_match(&match_str)
     }
 
     fn unsubscribe_properties_changed_or_suppress(&self, unit_name: &str) {
