@@ -174,7 +174,7 @@ impl BusWatcher {
         loop {
             for msg in self.connection.incoming(self.loop_timeout) {
                 if let Some(msg_body) = UnitNew::from_message(&msg) {
-                    self.handle_unit_new(&msg_body, &mut unit_states);
+                    self.handle_unit_new(&msg_body, &mut unit_states)?;
                 } else if let Some(msg_body) = UnitRemoved::from_message(&msg) {
                     self.handle_unit_removed(&msg_body, &mut unit_states);
                 } else if let Some(msg_body) = PropertiesChanged::from_message(&msg) {
@@ -348,28 +348,29 @@ impl BusWatcher {
     }
 
     // Handle the UnitNew signal.
+    //
+    // If any calls to systemd fail, assume the unit has been unloaded, and return Ok. If any calls
+    // to D-Bus fail, assume something worse has happened, and return Err.
     fn handle_unit_new(
         &self,
         msg_body: &UnitNew,
         unit_states: &mut HashMap<String, UnitStateMachine>,
-    ) {
+    ) -> Result<(), MyDBusError> {
         let borrowed_rules: Vec<&Rule> = self.settings.rules.iter().collect();
         let unit_name = &msg_body.arg0;
-        // Learn about the unit. If any calls to systemd fail, assume the unit has been unloaded and
-        // a UnitRemoved signal has been broadcast. The UnitRemoved handler should clean up the
-        // subscription to PropertiesChanged for that unit, if any.
         if rules_match_name(&borrowed_rules, unit_name) {
             let unit_path = match self.call_manager_get_unit(unit_name) {
                 Ok(unit_path) => unit_path,
-                Err(_) => return,
+                Err(_) => return Ok(()),
             };
-            self.subscribe_properties_changed(&unit_path).unwrap();
+            self.subscribe_properties_changed(&unit_path)?;
             let unit_props = match self.call_properties_get_all(&unit_path) {
                 Ok(unit_props) => unit_props,
-                Err(_) => return,
+                Err(_) => return Ok(()),
             };
             self.upsert_unit_states(unit_name, &unit_props, unit_states);
         }
+        Ok(())
     }
 
     // Handle the UnitRemoved signal.
