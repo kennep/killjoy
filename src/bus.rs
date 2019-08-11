@@ -167,7 +167,7 @@ impl BusWatcher {
                 Ok(unit_props) => unit_props,
                 Err(_) => continue,
             };
-            self.learn_unit_state_or_suppress(unit_name, &unit_props, &mut unit_states);
+            self.upsert_unit_states(unit_name, &unit_props, &mut unit_states);
         }
 
         // Infinitely process Unit{Removed,New} signals.
@@ -368,7 +368,7 @@ impl BusWatcher {
                 Ok(unit_props) => unit_props,
                 Err(_) => return,
             };
-            self.learn_unit_state_or_suppress(unit_name, &unit_props, unit_states);
+            self.upsert_unit_states(unit_name, &unit_props, unit_states);
         }
     }
 
@@ -452,50 +452,29 @@ impl BusWatcher {
             .or_insert_with(|| UnitStateMachine::new(active_state, timestamp, &on_change));
     }
 
-    // Get the given unit's state, and update `unit_states` as appropriate.
+    // Upsert the state machines in `unit_states` as appropriate.
     //
-    // This method asks systemd for several pieces of information about `unit_name`, such as its
-    // state. If systemd returns an error in response to those queries, this method immediately
-    // returns them, without making any changes to self. If you're sure that `unit_path` is correct
-    // (i.e. not mangled by a typo), it is probable that systemd unloaded the unit from memory. In
-    // this case, the error may be ignored, as `unfollow_unit` will catch the `UnitRemoved` signal
-    // and pop an entry from `unit_states`.
-    //
-    // If an unknown unit state is encountered, this method will panic. The `ActiveState` struct
-    // lists all known states.
-    fn learn_unit_state(
-        &self,
-        unit_name: &str,
-        unit_props: &HashMap<String, Variant<Box<RefArg + 'static>>>,
-        unit_states: &mut HashMap<String, UnitStateMachine>,
-    ) -> Result<(), DBusError> {
-        // Get and decode unit's ActiveState property.
-        let active_state_str: &str = unit_props.get("ActiveState").unwrap().0.as_str().unwrap();
-        let active_state = ActiveState::try_from(active_state_str).unwrap();
-
-        // Get timestamp at which that state was last entered.
-        let timestamp_key = get_timestamp_key(active_state);
-        let timestamp = unit_props.get(timestamp_key).unwrap().0.as_u64().unwrap();
-
-        // Update unit state machine.
-        let on_change = self.gen_on_change(&unit_name);
-        unit_states
-            .entry(unit_name.to_string())
-            .and_modify(|usm| usm.update(active_state, timestamp, &on_change))
-            .or_insert_with(|| UnitStateMachine::new(active_state, timestamp, &on_change));
-
-        Ok(())
-    }
-
-    fn learn_unit_state_or_suppress(
+    // If an error occurs while decoding `unit_props`, this method will panic.
+    fn upsert_unit_states(
         &self,
         unit_name: &str,
         unit_props: &HashMap<String, Variant<Box<RefArg + 'static>>>,
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) {
-        if let Err(err) = self.learn_unit_state(unit_name, unit_props, unit_states) {
-            eprintln!("Failed to learn ActiveState for {}: {}", unit_name, err)
-        }
+        // Get ActiveState property.
+        let active_state_str: &str = unit_props.get("ActiveState").unwrap().0.as_str().unwrap();
+        let active_state = ActiveState::try_from(active_state_str).unwrap();
+
+        // Get timestamp at which ActiveState was last entered.
+        let timestamp_key = get_timestamp_key(active_state);
+        let timestamp = unit_props.get(timestamp_key).unwrap().0.as_u64().unwrap();
+
+        // Upsert unit state machine.
+        let on_change = self.gen_on_change(&unit_name);
+        unit_states
+            .entry(unit_name.to_string())
+            .and_modify(|usm| usm.update(active_state, timestamp, &on_change))
+            .or_insert_with(|| UnitStateMachine::new(active_state, timestamp, &on_change));
     }
 
     // Subscribe to the `org.freedesktop.systemd1.Manager.UnitNew` signal.
