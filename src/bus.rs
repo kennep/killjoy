@@ -146,16 +146,24 @@ impl BusWatcher {
         self.subscribe_manager_unit_removed()?;
         self.subscribe_manager_unit_new()?;
 
-        // Review extant units, and act on interesting ones.
+        // Decide which extant units are interesting.
         let mut unit_states: HashMap<String, UnitStateMachine> = HashMap::new();
         let unit_names = self.call_manager_list_units()?;
         let filtered_unit_names = unit_names.iter().filter(|unit_name: &&String| {
             let borrowed_rules: Vec<&Rule> = self.settings.rules.iter().collect();
             rules_match_name(&borrowed_rules, unit_name)
         });
+
+        // Learn about interesting extant units. If any calls to systemd fail, assume the unit has
+        // been unloaded and a UnitRemoved signal has been broadcast. The UnitRemoved handler should
+        // clean up the subscription to PropertiesChanged for that unit, if any.
         for unit_name in filtered_unit_names {
-            self.subscribe_properties_changed_or_suppress(unit_name);
-            self.learn_unit_state_or_suppress(unit_name, &mut unit_states);
+            let unit_path = match self.call_manager_get_unit(unit_name) {
+                Ok(unit_path) => unit_path,
+                Err(_) => continue,
+            };
+            self.subscribe_properties_changed_or_suppress(&unit_path);
+            self.learn_unit_state_or_suppress(unit_name, &unit_path, &mut unit_states);
         }
 
         // Infinitely process Unit{Removed,New} signals.
@@ -173,6 +181,26 @@ impl BusWatcher {
             }
             if self.loop_once {
                 return Ok(());
+            }
+        }
+    }
+
+    // Call `org.freedesktop.systemd1.Manager.GetUnit`.
+    //
+    // Return the systemd unit path for `unit_name`, or an error if the unit is not loaded.
+    fn call_manager_get_unit(&self, unit_name: &str) -> Result<Path, MyDBusError> {
+        let result = self
+            .get_conn_path(&wrap_path_for_systemd())
+            .get_unit(unit_name);
+        match result {
+            Ok(unit_path) => Ok(unit_path),
+            Err(dbus_err) => {
+                let my_dbus_err = MyDBusError::new(format!(
+                    "Failed to call org.freedesktop.systemd1.Manager.GetUnit. Cause: {}",
+                    dbus_err,
+                ));
+                eprintln!("{}", my_dbus_err);
+                Err(my_dbus_err)
             }
         }
     }
@@ -295,9 +323,16 @@ impl BusWatcher {
     ) {
         let borrowed_rules: Vec<&Rule> = self.settings.rules.iter().collect();
         let unit_name = &msg_body.arg0;
+        // Learn about the unit. If any calls to systemd fail, assume the unit has been unloaded and
+        // a UnitRemoved signal has been broadcast. The UnitRemoved handler should clean up the
+        // subscription to PropertiesChanged for that unit, if any.
         if rules_match_name(&borrowed_rules, unit_name) {
-            self.subscribe_properties_changed_or_suppress(unit_name);
-            self.learn_unit_state_or_suppress(unit_name, unit_states);
+            let unit_path = match self.call_manager_get_unit(unit_name) {
+                Ok(unit_path) => unit_path,
+                Err(_) => return,
+            };
+            self.subscribe_properties_changed_or_suppress(&unit_path);
+            self.learn_unit_state_or_suppress(unit_name, &unit_path, unit_states);
         }
     }
 
@@ -395,14 +430,12 @@ impl BusWatcher {
     fn learn_unit_state(
         &self,
         unit_name: &str,
+        unit_path: &Path,
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) -> Result<(), DBusError> {
         // Get unit properties.
-        let path: Path = self
-            .get_conn_path(&wrap_path_for_systemd())
-            .get_unit(unit_name)?;
         let unit_props: HashMap<String, Variant<_>> = self
-            .get_conn_path(&path)
+            .get_conn_path(unit_path)
             .get_all("org.freedesktop.systemd1.Unit")?;
 
         // Get and decode unit's ActiveState property.
@@ -426,9 +459,10 @@ impl BusWatcher {
     fn learn_unit_state_or_suppress(
         &self,
         unit_name: &str,
+        unit_path: &Path,
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) {
-        if let Err(err) = self.learn_unit_state(&unit_name, unit_states) {
+        if let Err(err) = self.learn_unit_state(&unit_name, unit_path, unit_states) {
             eprintln!("Failed to learn ActiveState for {}: {}", unit_name, err)
         }
     }
@@ -474,20 +508,17 @@ impl BusWatcher {
     }
 
     // Subscribe to the `PropertiesChanged` signal for the given unit.
-    fn subscribe_properties_changed(&self, unit_name: &str) -> Result<(), DBusError> {
+    fn subscribe_properties_changed(&self, unit_path: &Path) -> Result<(), DBusError> {
         let bus_name = wrap_bus_name_for_systemd();
-        let path = self
-            .get_conn_path(&wrap_path_for_systemd())
-            .get_unit(unit_name)?;
-        let match_str = &PropertiesChanged::match_str(Some(&bus_name), Some(&path));
+        let match_str = &PropertiesChanged::match_str(Some(&bus_name), Some(&unit_path));
         self.connection.add_match(&match_str)
     }
 
-    fn subscribe_properties_changed_or_suppress(&self, unit_name: &str) {
-        if let Err(err) = self.subscribe_properties_changed(&unit_name) {
+    fn subscribe_properties_changed_or_suppress(&self, unit_path: &Path) {
+        if let Err(err) = self.subscribe_properties_changed(unit_path) {
             eprintln!(
                 "Failed to subscribe to PropertiesChanged for {}: {}",
-                unit_name, err
+                unit_path, err
             );
         }
     }
