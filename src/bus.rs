@@ -162,7 +162,7 @@ impl BusWatcher {
                 Ok(unit_path) => unit_path,
                 Err(_) => continue,
             };
-            self.subscribe_properties_changed_or_suppress(&unit_path);
+            self.subscribe_properties_changed(&unit_path)?;
             self.learn_unit_state_or_suppress(unit_name, &unit_path, &mut unit_states);
         }
 
@@ -331,7 +331,7 @@ impl BusWatcher {
                 Ok(unit_path) => unit_path,
                 Err(_) => return,
             };
-            self.subscribe_properties_changed_or_suppress(&unit_path);
+            self.subscribe_properties_changed(&unit_path).unwrap();
             self.learn_unit_state_or_suppress(unit_name, &unit_path, unit_states);
         }
     }
@@ -507,19 +507,21 @@ impl BusWatcher {
         }
     }
 
-    // Subscribe to the `PropertiesChanged` signal for the given unit.
-    fn subscribe_properties_changed(&self, unit_path: &Path) -> Result<(), DBusError> {
+    // Subscribe to the `org.freedesktop.DBus.Properties.PropertiesChanged` signal.
+    fn subscribe_properties_changed(&self, unit_path: &Path) -> Result<(), MyDBusError> {
         let bus_name = wrap_bus_name_for_systemd();
         let match_str = &PropertiesChanged::match_str(Some(&bus_name), Some(&unit_path));
-        self.connection.add_match(&match_str)
-    }
-
-    fn subscribe_properties_changed_or_suppress(&self, unit_path: &Path) {
-        if let Err(err) = self.subscribe_properties_changed(unit_path) {
-            eprintln!(
-                "Failed to subscribe to PropertiesChanged for {}: {}",
-                unit_path, err
-            );
+        let result = self.connection.add_match(&match_str);
+        match result {
+            Ok(_) => Ok(()),
+            Err(dbus_err) => {
+                let my_dbus_err = MyDBusError::new(format!(
+                    "Failed to subscribe to org.freedesktop.DBus.Properties.PropertiesChanged. Cause: {}",
+                    dbus_err
+                ));
+                eprintln!("{}", my_dbus_err);
+                Err(my_dbus_err)
+            }
         }
     }
 
