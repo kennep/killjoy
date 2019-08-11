@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-use dbus::arg::Variant;
+use dbus::arg::{RefArg, Variant};
 use dbus::{
     BusName, BusType, ConnPath, Connection, Error as DBusError, Interface, Member, Message, Path,
     SignalArgs,
@@ -163,7 +163,11 @@ impl BusWatcher {
                 Err(_) => continue,
             };
             self.subscribe_properties_changed(&unit_path)?;
-            self.learn_unit_state_or_suppress(unit_name, &unit_path, &mut unit_states);
+            let unit_props = match self.call_properties_get_all(&unit_path) {
+                Ok(unit_props) => unit_props,
+                Err(_) => continue,
+            };
+            self.learn_unit_state_or_suppress(unit_name, &unit_props, &mut unit_states);
         }
 
         // Infinitely process Unit{Removed,New} signals.
@@ -181,6 +185,34 @@ impl BusWatcher {
             }
             if self.loop_once {
                 return Ok(());
+            }
+        }
+    }
+
+    // Call `org.freedesktop.DBus.Properties.GetAll`.
+    //
+    // This interface and method is widely implemented. Call it on bus name
+    // `org.freedesktop.systemd1`, path name `unit_path`. The method accepts an `interface_name`,
+    // which defines which interface is being queried.
+    //
+    // Return the response, or an error if one occurs. An error will be returned if the unit
+    // corresponding to `unit_path` has been unloaded.
+    fn call_properties_get_all(
+        &self,
+        unit_path: &Path,
+    ) -> Result<HashMap<String, Variant<Box<RefArg + 'static>>>, MyDBusError> {
+        match self
+            .get_conn_path(unit_path)
+            .get_all("org.freedesktop.systemd1.Unit")
+        {
+            Ok(unit_props) => Ok(unit_props),
+            Err(dbus_err) => {
+                let my_dbus_err = MyDBusError::new(format!(
+                    "Failed to call org.freedesktop.DBus.Properties.GetAll. Cause: {}",
+                    dbus_err
+                ));
+                eprintln!("{}", my_dbus_err);
+                Err(my_dbus_err)
             }
         }
     }
@@ -332,7 +364,11 @@ impl BusWatcher {
                 Err(_) => return,
             };
             self.subscribe_properties_changed(&unit_path).unwrap();
-            self.learn_unit_state_or_suppress(unit_name, &unit_path, unit_states);
+            let unit_props = match self.call_properties_get_all(&unit_path) {
+                Ok(unit_props) => unit_props,
+                Err(_) => return,
+            };
+            self.learn_unit_state_or_suppress(unit_name, &unit_props, unit_states);
         }
     }
 
@@ -430,14 +466,9 @@ impl BusWatcher {
     fn learn_unit_state(
         &self,
         unit_name: &str,
-        unit_path: &Path,
+        unit_props: &HashMap<String, Variant<Box<RefArg + 'static>>>,
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) -> Result<(), DBusError> {
-        // Get unit properties.
-        let unit_props: HashMap<String, Variant<_>> = self
-            .get_conn_path(unit_path)
-            .get_all("org.freedesktop.systemd1.Unit")?;
-
         // Get and decode unit's ActiveState property.
         let active_state_str: &str = unit_props.get("ActiveState").unwrap().0.as_str().unwrap();
         let active_state = ActiveState::try_from(active_state_str).unwrap();
@@ -459,10 +490,10 @@ impl BusWatcher {
     fn learn_unit_state_or_suppress(
         &self,
         unit_name: &str,
-        unit_path: &Path,
+        unit_props: &HashMap<String, Variant<Box<RefArg + 'static>>>,
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) {
-        if let Err(err) = self.learn_unit_state(&unit_name, unit_path, unit_states) {
+        if let Err(err) = self.learn_unit_state(unit_name, unit_props, unit_states) {
             eprintln!("Failed to learn ActiveState for {}: {}", unit_name, err)
         }
     }
