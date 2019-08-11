@@ -146,28 +146,27 @@ impl BusWatcher {
         self.subscribe_manager_unit_removed()?;
         self.subscribe_manager_unit_new()?;
 
-        // Decide which extant units are interesting.
-        let mut unit_states: HashMap<String, UnitStateMachine> = HashMap::new();
-        let unit_names = self.call_manager_list_units()?;
-        let filtered_unit_names = unit_names.iter().filter(|unit_name: &&String| {
-            let borrowed_rules: Vec<&Rule> = self.settings.rules.iter().collect();
-            rules_match_name(&borrowed_rules, unit_name)
-        });
-
         // Learn about interesting extant units. If any calls to systemd fail, assume the unit has
         // been unloaded and a UnitRemoved signal has been broadcast. The UnitRemoved handler should
         // clean up the subscription to PropertiesChanged for that unit, if any.
-        for unit_name in filtered_unit_names {
-            let unit_path = match self.call_manager_get_unit(unit_name) {
-                Ok(unit_path) => unit_path,
-                Err(_) => continue,
-            };
-            self.subscribe_properties_changed(&unit_path)?;
-            let unit_props = match self.call_properties_get_all(&unit_path) {
-                Ok(unit_props) => unit_props,
-                Err(_) => continue,
-            };
-            self.upsert_unit_states(unit_name, &unit_props, &mut unit_states);
+        let mut unit_states: HashMap<String, UnitStateMachine> = HashMap::new();
+        {
+            let borrowed_rules: Vec<&Rule> = self.settings.rules.iter().collect();
+            let unit_names: Vec<String> = self.call_manager_list_units()?;
+            for unit_name in unit_names {
+                if rules_match_name(&borrowed_rules, &unit_name) {
+                    let unit_path = match self.call_manager_get_unit(&unit_name) {
+                        Ok(unit_path) => unit_path,
+                        Err(_) => continue,
+                    };
+                    self.subscribe_properties_changed(&unit_path)?;
+                    let unit_props = match self.call_properties_get_all(&unit_path) {
+                        Ok(unit_props) => unit_props,
+                        Err(_) => continue,
+                    };
+                    self.upsert_unit_states(&unit_name, &unit_props, &mut unit_states);
+                }
+            }
         }
 
         // Infinitely process Unit{Removed,New} signals.
