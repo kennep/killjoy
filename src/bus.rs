@@ -149,16 +149,14 @@ impl BusWatcher {
         // Review extant units, and act on interesting ones.
         let mut unit_states: HashMap<String, UnitStateMachine> = HashMap::new();
         let unit_names = self.call_manager_list_units()?;
-        unit_names
-            .iter()
-            .filter(|unit_name: &&String| {
-                let borrowed_rules: Vec<&Rule> = self.settings.rules.iter().collect();
-                rules_match_name(&borrowed_rules, unit_name)
-            })
-            .for_each(|unit_name: &String| {
-                self.subscribe_properties_changed_or_suppress(unit_name);
-                self.learn_unit_state_or_suppress(unit_name, &mut unit_states);
-            });
+        let filtered_unit_names = unit_names.iter().filter(|unit_name: &&String| {
+            let borrowed_rules: Vec<&Rule> = self.settings.rules.iter().collect();
+            rules_match_name(&borrowed_rules, unit_name)
+        });
+        for unit_name in filtered_unit_names {
+            self.subscribe_properties_changed_or_suppress(unit_name);
+            self.learn_unit_state_or_suppress(unit_name, &mut unit_states);
+        }
 
         // Infinitely process Unit{Removed,New} signals.
         loop {
