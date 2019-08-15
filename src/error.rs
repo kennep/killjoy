@@ -18,7 +18,13 @@ impl Error for FindConfigFileError {}
 // An error indicating that parsing an object to an ActiveState failed.
 #[derive(Debug)]
 pub struct ParseAsActiveStateError {
-    pub msg: String,
+    msg: String,
+}
+
+impl ParseAsActiveStateError {
+    pub fn new(msg: String) -> Self {
+        Self { msg }
+    }
 }
 
 impl Display for ParseAsActiveStateError {
@@ -32,7 +38,13 @@ impl Error for ParseAsActiveStateError {}
 // An error indicating that parsing a configuration file failed.
 #[derive(Debug)]
 pub struct ParseConfigFileError {
-    pub msg: String,
+    msg: String,
+}
+
+impl ParseConfigFileError {
+    pub fn new(msg: String) -> Self {
+        Self { msg }
+    }
 }
 
 impl Display for ParseConfigFileError {
@@ -51,7 +63,7 @@ impl Error for ParseConfigFileError {}
 // wrong.
 #[derive(Debug)]
 pub struct MyDBusError {
-    pub msg: String,
+    msg: String,
 }
 
 impl MyDBusError {

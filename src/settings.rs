@@ -114,7 +114,7 @@ impl TryFrom<SerdeRule> for Rule {
             "unit type" => Expression::UnitType(value.expression.to_owned()),
             other => {
                 let msg = format!("Found unknown expression type: {}", other);
-                return Err(Box::new(ParseConfigFileError { msg }));
+                return Err(Box::new(ParseConfigFileError::new(msg)));
             }
         };
 
@@ -175,7 +175,7 @@ impl TryFrom<SerdeSettings> for Settings {
             for notifier in &rule.notifiers {
                 if !notifiers.contains_key(notifier) {
                     let msg = format!("Rule references non-existent notifier: {}", notifier);
-                    return Err(Box::new(ParseConfigFileError { msg }));
+                    return Err(Box::new(ParseConfigFileError::new(msg)));
                 }
             }
             rules.push(rule);

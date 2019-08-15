@@ -48,9 +48,10 @@ impl TryFrom<&str> for ActiveState {
             "deactivating" => Ok(ActiveState::Deactivating),
             "failed" => Ok(ActiveState::Failed),
             "inactive" => Ok(ActiveState::Inactive),
-            _ => Err(ParseAsActiveStateError {
-                msg: format!("Failed to parse string as ActiveState: {}", value,),
-            }),
+            _ => Err(ParseAsActiveStateError::new(format!(
+                "Failed to parse string as ActiveState: {}",
+                value,
+            ))),
         }
     }
 }
