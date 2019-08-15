@@ -2,22 +2,22 @@
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
-use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
 use dbus::{BusName, BusType};
+use regex::Regex;
 use serde::Deserialize;
 use xdg::BaseDirectories;
 
-use crate::error::{FindConfigFileError, ParseConfigFileError};
+use crate::error::SettingsFileError;
 use crate::unit::ActiveState;
 
 // The expressions that a user may use to match unit names.
 #[derive(Clone, Debug)]
 pub enum Expression {
-    Regex(regex::Regex),
+    Regex(Regex),
     UnitName(String),
     UnitType(String),
 }
@@ -53,7 +53,7 @@ impl Notifier {
     // Create a new notifier.
     //
     // Return an error if any arguments are invalid.
-    pub fn new(bus_name: &str, bus_type: BusType) -> Result<Self, Box<dyn Error>> {
+    pub fn new(bus_name: &str, bus_type: BusType) -> Result<Self, SettingsFileError> {
         let new_obj = Self {
             bus_name: bus_name.to_owned(),
             bus_type,
@@ -62,20 +62,21 @@ impl Notifier {
         Ok(new_obj)
     }
 
-    /// Get the `bus_name` attribute.
+    // Get the `bus_name` attribute.
     pub fn get_bus_name(&self) -> BusName {
         self.maybe_get_bus_name().expect(
             "bus_name is invalid. new() should have caught this. Please contact a developer.",
         )
     }
 
-    fn maybe_get_bus_name<'bn>(&'bn self) -> Result<BusName<'bn>, Box<dyn Error>> {
-        Ok(BusName::new(&self.bus_name[..])?)
+    fn maybe_get_bus_name(&self) -> Result<BusName, SettingsFileError> {
+        BusName::new(&self.bus_name[..])
+            .map_err(|_| SettingsFileError::InvalidBusName(self.bus_name.to_owned()))
     }
 }
 
 impl TryFrom<SerdeNotifier> for Notifier {
-    type Error = Box<dyn Error>;
+    type Error = SettingsFileError;
 
     fn try_from(value: SerdeNotifier) -> Result<Self, Self::Error> {
         let notifier = Notifier::new(&value.bus_name, decode_bus_type_str(&value.bus_type)?)?;
@@ -97,26 +98,28 @@ pub struct Rule {
 }
 
 impl TryFrom<SerdeRule> for Rule {
-    type Error = Box<dyn Error>;
+    type Error = SettingsFileError;
 
     fn try_from(value: SerdeRule) -> Result<Self, Self::Error> {
         let mut active_states: HashSet<ActiveState> = HashSet::new();
         for active_state_string in &value.active_states {
-            let active_state = ActiveState::try_from(&active_state_string[..])?;
+            let active_state = ActiveState::try_from(&active_state_string[..]).map_err(|_| {
+                SettingsFileError::InvalidActiveState(active_state_string.to_owned())
+            })?;
             active_states.insert(active_state);
         }
+        let active_states = active_states;
 
         let bus_type = decode_bus_type_str(&value.bus_type)?;
 
         let expression: Expression = match &value.expression_type[..] {
-            "regex" => Expression::Regex(regex::Regex::new(&value.expression[..])?),
-            "unit name" => Expression::UnitName(value.expression.to_owned()),
-            "unit type" => Expression::UnitType(value.expression.to_owned()),
-            other => {
-                let msg = format!("Found unknown expression type: {}", other);
-                return Err(Box::new(ParseConfigFileError::new(msg)));
-            }
-        };
+            "regex" => Regex::new(&value.expression[..])
+                .map(Expression::Regex)
+                .map_err(SettingsFileError::InvalidRegex),
+            "unit name" => Ok(Expression::UnitName(value.expression.to_owned())),
+            "unit type" => Ok(Expression::UnitType(value.expression.to_owned())),
+            other => Err(SettingsFileError::InvalidExpressionType(other.to_owned())),
+        }?;
 
         let notifiers = value.notifiers.to_owned();
 
@@ -149,19 +152,17 @@ impl Settings {
     //     didn't match the settings file schema; or so on.
     // *   The settings object contained semantically invalid data. Maybe a `"bus_type"` key was set
     //     to a value such as `"foo"`, or so on.
-    pub fn new<T: Read>(reader: T) -> Result<Self, Box<dyn Error>> {
-        let serde_settings: SerdeSettings = serde_json::from_reader(reader)?;
-        let settings = Self::try_from(serde_settings)?;
-        Ok(settings)
+    pub fn new<T: Read>(reader: T) -> Result<Self, SettingsFileError> {
+        let serde_settings: SerdeSettings =
+            serde_json::from_reader(reader).map_err(SettingsFileError::DeserializationFailed)?;
+        Self::try_from(serde_settings)
     }
 }
 
 impl TryFrom<SerdeSettings> for Settings {
-    type Error = Box<dyn Error>;
+    type Error = SettingsFileError;
 
     fn try_from(value: SerdeSettings) -> Result<Self, Self::Error> {
-        // Use for loops instead of chaining method calls on iter() so that the ? operator may be
-        // used.
         let mut notifiers: HashMap<String, Notifier> = HashMap::new();
         for (key, serde_notifier) in value.notifiers.into_iter() {
             let notifier = Notifier::try_from(serde_notifier)?;
@@ -174,8 +175,7 @@ impl TryFrom<SerdeSettings> for Settings {
             let rule = Rule::try_from(serde_rule)?;
             for notifier in &rule.notifiers {
                 if !notifiers.contains_key(notifier) {
-                    let msg = format!("Rule references non-existent notifier: {}", notifier);
-                    return Err(Box::new(ParseConfigFileError::new(msg)));
+                    return Err(SettingsFileError::InvalidNotifier(notifier.to_owned()));
                 }
             }
             rules.push(rule);
@@ -255,15 +255,12 @@ impl Into<BusType> for HashableBusType {
     }
 }
 
-pub fn decode_bus_type_str(bus_type_str: &str) -> Result<BusType, String> {
+pub fn decode_bus_type_str(bus_type_str: &str) -> Result<BusType, SettingsFileError> {
     match bus_type_str {
         "session" => Ok(BusType::Session),
         "starter" => Ok(BusType::Starter),
         "system" => Ok(BusType::System),
-        _ => Err(format!(
-            "Failed to decode bus type string: {}",
-            bus_type_str
-        )),
+        other => Err(SettingsFileError::InvalidBusType(other.to_owned())),
     }
 }
 
@@ -284,16 +281,13 @@ pub fn get_bus_types(rules: &[Rule]) -> Vec<BusType> {
 // Search several paths for a settings file, in order of preference.
 //
 // If a file is found, return its path. Otherwise, return an error describing why.
-pub fn get_load_path() -> Result<PathBuf, Box<dyn Error>> {
-    let dirs = match BaseDirectories::with_prefix("killjoy") {
-        Ok(dirs) => dirs,
-        Err(err) => return Err(Box::new(err)),
-    };
-    let path_buf = match dirs.find_config_file("settings.json") {
-        Some(path_buf) => path_buf,
-        None => return Err(Box::new(FindConfigFileError)),
-    };
-    Ok(path_buf)
+pub fn get_load_path() -> Result<PathBuf, SettingsFileError> {
+    let prefix = "killjoy";
+    let suffix = "settings.json";
+    BaseDirectories::with_prefix(prefix)
+        .map_err(|_| SettingsFileError::FileNotFound(format!("{}/{}", prefix, suffix)))?
+        .find_config_file(suffix)
+        .ok_or_else(|| SettingsFileError::FileNotFound(format!("{}/{}", prefix, suffix)))
 }
 
 // Read the configuration file into a Settings object.
@@ -302,19 +296,15 @@ pub fn get_load_path() -> Result<PathBuf, Box<dyn Error>> {
 //
 // *   The file couldn't be opened. Maybe a settings file couldn't be found; or maybe a settings
 //     file was found but could not be opened.
-// *   The file contained invalid contents. See [Settings::new](struct.Settings.html#method.new).
-pub fn load(path: Option<&Path>) -> Result<Settings, Box<dyn Error>> {
-    let handle_opt = match path {
+// *   The file contained invalid contents.
+pub fn load(path_opt: Option<&Path>) -> Result<Settings, SettingsFileError> {
+    let handle_res = match path_opt {
         Some(path) => File::open(path),
         None => File::open(get_load_path()?.as_path()),
     };
-    let handle = match handle_opt {
-        Ok(handle) => handle,
-        Err(err) => return Err(Box::new(err)),
-    };
+    let handle = handle_res.map_err(SettingsFileError::FileNotReadable)?;
     let reader = BufReader::new(handle);
-    let settings = Settings::new(reader)?;
-    Ok(settings)
+    Settings::new(reader)
 }
 
 #[cfg(test)]
@@ -425,7 +415,7 @@ mod tests {
 
     #[test]
     fn test_expression_regex_matches() {
-        let expression = Expression::Regex(regex::Regex::new(r"a\.service").unwrap());
+        let expression = Expression::Regex(Regex::new(r"a\.service").unwrap());
         assert!(!expression.matches(".service"));
         assert!(expression.matches("a.service"));
         assert!(expression.matches("aa.service"));

@@ -2,18 +2,80 @@
 
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
+use std::io::Error as IOError;
 
-// An error indicating that finding a configuration file failed.
+use regex::Error as RegexError;
+use serde_json::error::Error as SerdeJsonError;
+
+// An error used when working with a settings file.
 #[derive(Debug)]
-pub struct FindConfigFileError;
+pub enum SettingsFileError {
+    // Failed to deserialize the settings file.
+    DeserializationFailed(SerdeJsonError),
+    // Failed to find a settings file.
+    FileNotFound(String),
+    // Failed to read settings file.
+    FileNotReadable(IOError),
+    // The settings file included an invalid active state.
+    InvalidActiveState(String),
+    // The settings file included an invalid bus name.
+    InvalidBusName(String),
+    // The settings file included an invalid bus type.
+    InvalidBusType(String),
+    // The settings file included an invalid expression type.
+    InvalidExpressionType(String),
+    // A rule referenced a non-existent notifier.
+    InvalidNotifier(String),
+    // The settings file included an invalid regex.
+    InvalidRegex(RegexError),
+}
 
-impl Display for FindConfigFileError {
+impl Display for SettingsFileError {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "No configuration file found.")
+        match self {
+            SettingsFileError::DeserializationFailed(err) => {
+                write!(f, "Failed to deserialize the settings file: {}", err,)
+            }
+            SettingsFileError::FileNotFound(path) => write!(
+                f,
+                "Failed to find a configuration file in $XDG_CONFIG_HOME or $XDG_CONFIG_DIRS with path {}",
+                path
+            ),
+            SettingsFileError::FileNotReadable(err) => {
+                write!(f, "Failed to read settings file: {}", err)
+            }
+            SettingsFileError::InvalidActiveState(as_str) => {
+                write!(f, "Found invalid active state: {}", as_str)
+            }
+            SettingsFileError::InvalidBusName(bn_str) => {
+                write!(f, "Found invalid bus name: {}", bn_str)
+            }
+            SettingsFileError::InvalidBusType(bt_str) => {
+                write!(f, "Found invalid bus type: {}", bt_str)
+            }
+            SettingsFileError::InvalidExpressionType(et_str) => {
+                write!(f, "Found invalid expression type: {}", et_str)
+            }
+            SettingsFileError::InvalidRegex(err) => {
+                write!(f, "Found invalid regular expression: {}", err)
+            }
+            SettingsFileError::InvalidNotifier(notifier) => {
+                write!(f, "Rule references non-existent notifier: {}", notifier)
+            }
+        }
     }
 }
 
-impl Error for FindConfigFileError {}
+impl Error for SettingsFileError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            SettingsFileError::DeserializationFailed(err) => Some(err),
+            SettingsFileError::FileNotReadable(err) => Some(err),
+            SettingsFileError::InvalidRegex(err) => Some(err),
+            _ => None,
+        }
+    }
+}
 
 // An error indicating that parsing an object to an ActiveState failed.
 #[derive(Debug)]
@@ -34,26 +96,6 @@ impl Display for ParseAsActiveStateError {
 }
 
 impl Error for ParseAsActiveStateError {}
-
-// An error indicating that parsing a configuration file failed.
-#[derive(Debug)]
-pub struct ParseConfigFileError {
-    msg: String,
-}
-
-impl ParseConfigFileError {
-    pub fn new(msg: String) -> Self {
-        Self { msg }
-    }
-}
-
-impl Display for ParseConfigFileError {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "{}", &self.msg[..])
-    }
-}
-
-impl Error for ParseConfigFileError {}
 
 // Like dbus::Error, but implements Send.
 //
