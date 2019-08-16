@@ -451,10 +451,7 @@ mod tests {
                 "version": 1
             }
         "###;
-        match Settings::new(settings_str.as_bytes()) {
-            Ok(_) => {}
-            _ => panic!("expected success"),
-        }
+        Settings::new(settings_str.as_bytes()).expect("valid settings parsed as invalid");
     }
 
     // Settings::new()

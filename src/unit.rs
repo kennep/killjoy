@@ -120,11 +120,12 @@ impl UnitStateMachine {
 mod tests {
     use super::*;
 
+    fn null_on_change(_: &UnitStateMachine, _: Option<ActiveState>) {}
+
     // Pass a unit state and a timestamp.
     #[test]
     fn test_usm_new() {
-        let on_change = |_: &UnitStateMachine, _: Option<ActiveState>| {};
-        let usm = UnitStateMachine::new(ActiveState::Failed, 10, &on_change);
+        let usm = UnitStateMachine::new(ActiveState::Failed, 10, &null_on_change);
         assert_eq!(usm.active_state, ActiveState::Failed);
         assert_eq!(usm.timestamp, 10);
     }
@@ -132,14 +133,13 @@ mod tests {
     // Unsuccessfully update the state machine.
     #[test]
     fn test_usm_update_v1() {
-        let on_change = |_: &UnitStateMachine, _: Option<ActiveState>| {};
-        let mut usm = UnitStateMachine::new(ActiveState::Inactive, 25, &on_change);
+        let mut usm = UnitStateMachine::new(ActiveState::Inactive, 25, &null_on_change);
 
-        usm.update(ActiveState::Activating, 24, &on_change);
+        usm.update(ActiveState::Activating, 24, &null_on_change);
         assert_eq!(usm.active_state, ActiveState::Inactive);
         assert_eq!(usm.timestamp, 25);
 
-        usm.update(ActiveState::Active, 25, &on_change);
+        usm.update(ActiveState::Active, 25, &null_on_change);
         assert_eq!(usm.active_state, ActiveState::Inactive);
         assert_eq!(usm.timestamp, 25);
     }
@@ -147,14 +147,13 @@ mod tests {
     // Successfully update the state machine.
     #[test]
     fn test_usm_update_v2() {
-        let on_change = |_: &UnitStateMachine, _: Option<ActiveState>| {};
-        let mut usm = UnitStateMachine::new(ActiveState::Inactive, 25, &on_change);
+        let mut usm = UnitStateMachine::new(ActiveState::Inactive, 25, &null_on_change);
 
-        usm.update(ActiveState::Activating, 26, &on_change);
+        usm.update(ActiveState::Activating, 26, &null_on_change);
         assert_eq!(usm.active_state, ActiveState::Activating);
         assert_eq!(usm.timestamp, 26);
 
-        usm.update(ActiveState::Active, 27, &on_change);
+        usm.update(ActiveState::Active, 27, &null_on_change);
         assert_eq!(usm.active_state, ActiveState::Active);
         assert_eq!(usm.timestamp, 27);
     }
@@ -197,10 +196,7 @@ mod tests {
     // Convert some other string to an ActiveState. (It should fail.)
     #[test]
     fn test_active_state_from_other() {
-        match ActiveState::try_from("foo") {
-            Ok(_) => panic!("Conversion should have failed."),
-            Err(_) => {}
-        }
+        ActiveState::try_from("foo").expect_err("Conversion should have failed.");
     }
 
     #[test]
