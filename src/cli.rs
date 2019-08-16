@@ -63,8 +63,7 @@ impl HelpMessagesFactory {
     //
     // Creating a factory can be an expensive operation, as it involves compiling a regex.
     fn new() -> Self {
-        let re = Self::get_re();
-        HelpMessagesFactory { re }
+        HelpMessagesFactory { re: Self::re() }
     }
 
     // Create a struct containing help messages formatted for the current terminal.
@@ -101,7 +100,7 @@ impl HelpMessagesFactory {
     //
     //      five six
     //
-    fn get_re() -> Regex {
+    fn re() -> Regex {
         Regex::new(r"(?P<pre>\S)\n(?P<post>\S)").expect("Failed to compile regex.")
     }
 
@@ -120,5 +119,20 @@ impl HelpMessagesFactory {
         Check to see whether the settings file conforms with a schema. If so, silently exit.
         Otherwise, print an error message to stderr and return non-zero.
         "###
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_help_messages_factory_re() {
+        HelpMessagesFactory::re();
+    }
+
+    #[test]
+    fn test_help_messages_factory_new() {
+        HelpMessagesFactory::new();
     }
 }
