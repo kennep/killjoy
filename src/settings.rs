@@ -31,7 +31,7 @@ impl Expression {
     //
     // Regular expressions are implemented with the regex crate. See: https://docs.rs/regex/
     pub fn matches(&self, unit_name: &str) -> bool {
-        match &self {
+        match self {
             Expression::Regex(expr) => expr.is_match(unit_name),
             Expression::UnitName(expr) => unit_name == expr,
             Expression::UnitType(expr) => unit_name.ends_with(expr),
@@ -394,7 +394,7 @@ mod tests {
     fn test_expression_unit_name_matches_success() {
         let unit_name = "aaa.service";
         let expression = Expression::UnitName("aaa.service".to_string());
-        assert!(expression.matches(&unit_name));
+        assert!(expression.matches(unit_name));
     }
 
     // Expression::UnitName::matches()
@@ -402,7 +402,7 @@ mod tests {
     fn test_expression_unit_name_matches_failure() {
         let unit_name = "aaa.service";
         let expression = Expression::UnitName("aa.service".to_string());
-        assert!(!expression.matches(&unit_name));
+        assert!(!expression.matches(unit_name));
     }
 
     // Expression::UnitType::matches()
@@ -410,7 +410,7 @@ mod tests {
     fn test_expression_unit_type_matches_success() {
         let unit_name = "aaa.service";
         let expression = Expression::UnitType(".service".to_string());
-        assert!(expression.matches(&unit_name));
+        assert!(expression.matches(unit_name));
     }
 
     // Expression::UnitType::matches()
@@ -418,7 +418,7 @@ mod tests {
     fn test_expression_unit_type_matches_failure() {
         let unit_name = "aaa.service";
         let expression = Expression::UnitType(".mount".to_string());
-        assert!(!expression.matches(&unit_name));
+        assert!(!expression.matches(unit_name));
     }
 
     // Expression::UnitRegex::matches()
