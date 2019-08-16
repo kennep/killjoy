@@ -338,6 +338,7 @@ mod tests {
 
     use super::*;
 
+    // get_bus_types()
     #[test]
     fn test_get_bus_types_v1() {
         let settings = Settings {
@@ -349,6 +350,7 @@ mod tests {
         assert!(!bus_types.contains(&BusType::System));
     }
 
+    // get_bus_types()
     #[test]
     fn test_get_bus_types_v2() {
         let settings = Settings {
@@ -360,6 +362,7 @@ mod tests {
         assert!(!bus_types.contains(&BusType::System));
     }
 
+    // get_bus_types()
     #[test]
     fn test_get_bus_types_v3() {
         let settings = Settings {
@@ -371,6 +374,7 @@ mod tests {
         assert!(bus_types.contains(&BusType::System));
     }
 
+    // get_bus_types()
     #[test]
     fn test_get_bus_types_v4() {
         let settings = Settings {
@@ -385,6 +389,7 @@ mod tests {
         assert!(bus_types.contains(&BusType::System));
     }
 
+    // Expression::UnitName::matches()
     #[test]
     fn test_expression_unit_name_matches_success() {
         let unit_name = "aaa.service";
@@ -392,6 +397,7 @@ mod tests {
         assert!(expression.matches(&unit_name));
     }
 
+    // Expression::UnitName::matches()
     #[test]
     fn test_expression_unit_name_matches_failure() {
         let unit_name = "aaa.service";
@@ -399,6 +405,7 @@ mod tests {
         assert!(!expression.matches(&unit_name));
     }
 
+    // Expression::UnitType::matches()
     #[test]
     fn test_expression_unit_type_matches_success() {
         let unit_name = "aaa.service";
@@ -406,6 +413,7 @@ mod tests {
         assert!(expression.matches(&unit_name));
     }
 
+    // Expression::UnitType::matches()
     #[test]
     fn test_expression_unit_type_matches_failure() {
         let unit_name = "aaa.service";
@@ -413,6 +421,7 @@ mod tests {
         assert!(!expression.matches(&unit_name));
     }
 
+    // Expression::UnitRegex::matches()
     #[test]
     fn test_expression_regex_matches() {
         let expression = Expression::Regex(Regex::new(r"a\.service").unwrap());
@@ -421,33 +430,11 @@ mod tests {
         assert!(expression.matches("aa.service"));
     }
 
+    // Settings::new()
     #[test]
-    fn test_notifier_new_success() {
-        let bus_name = "org.freedesktop.Notifications";
-        let bus_type = BusType::Session;
-        Notifier::new(bus_name, bus_type).unwrap();
-    }
-
-    #[test]
-    fn test_notifier_new_failure() {
-        let bus_name = "org/freedesktop/Notifications";
-        let bus_type = BusType::Session;
-        match Notifier::new(bus_name, bus_type) {
-            Ok(_) => panic!("bus_name should have been invalid"),
-            Err(_) => {}
-        }
-    }
-
-    #[test]
-    fn test_settings_new_success() {
+    fn test_settings_new() {
         let settings_str = r###"
             {
-                "notifiers": {
-                    "desktop popup": {
-                        "bus_name": "org.freedesktop.Notifications",
-                        "bus_type": "session"
-                    }
-                },
                 "rules": [{
                         "active_states": ["failed"],
                         "bus_type": "session",
@@ -455,13 +442,234 @@ mod tests {
                         "expression_type": "unit name",
                         "notifiers": ["desktop popup"]
                 }],
+                "notifiers": {
+                    "desktop popup": {
+                        "bus_name": "name.jerebear.KilljoyNotifierNotification1",
+                        "bus_type": "session"
+                    }
+                },
                 "version": 1
             }
         "###;
-        let settings: Settings = Settings::new(settings_str.as_bytes()).unwrap();
+        match Settings::new(settings_str.as_bytes()) {
+            Ok(_) => {}
+            _ => panic!("expected success"),
+        }
+    }
 
-        let actual = settings.notifiers.get("desktop popup").unwrap().bus_type;
-        let target = BusType::Session;
-        assert_eq!(actual, target);
+    // Settings::new()
+    #[test]
+    fn test_settings_new_deserialization_failed() {
+        let settings_str = r###"
+            {
+                "rules": [{
+                        "active_states": ["failed"],
+                        "bus_type": "session",
+                        "expression": "syncthing.service",
+                        "expression_type": "unit name",
+                        "notifiers": ["desktop popup"]
+                }],
+                "notifiers": {
+                    "desktop popup": {
+                        "bus_name": "name.jerebear.KilljoyNotifierNotification1",
+                        "bus_type": "session",
+                    }
+                },
+                "version": 1
+            }
+        "###;
+        match Settings::new(settings_str.as_bytes()) {
+            Err(SettingsFileError::DeserializationFailed(_)) => {}
+            _ => panic!("expected DeserializationFailed; an extra comma has been added"),
+        }
+    }
+
+    // Settings::new()
+    #[test]
+    fn test_settings_new_invalid_active_state() {
+        let settings_str = r###"
+            {
+                "rules": [{
+                        "active_states": ["failedd"],
+                        "bus_type": "session",
+                        "expression": "syncthing.service",
+                        "expression_type": "unit name",
+                        "notifiers": ["desktop popup"]
+                }],
+                "notifiers": {
+                    "desktop popup": {
+                        "bus_name": "name.jerebear.KilljoyNotifierNotification1",
+                        "bus_type": "session"
+                    }
+                },
+                "version": 1
+            }
+        "###;
+        match Settings::new(settings_str.as_bytes()) {
+            Err(SettingsFileError::InvalidActiveState(_)) => {}
+            _ => panic!("expected InvalidActiveState; an active state has been typo'd"),
+        }
+    }
+
+    // Settings::new()
+    #[test]
+    fn test_settings_new_invalid_bus_name() {
+        let settings_str = r###"
+            {
+                "rules": [{
+                        "active_states": ["failed"],
+                        "bus_type": "session",
+                        "expression": "syncthing.service",
+                        "expression_type": "unit name",
+                        "notifiers": ["desktop popup"]
+                }],
+                "notifiers": {
+                    "desktop popup": {
+                        "bus_name": "name/jerebear/KilljoyNotifierNotification1",
+                        "bus_type": "session"
+                    }
+                },
+                "version": 1
+            }
+        "###;
+        match Settings::new(settings_str.as_bytes()) {
+            Err(SettingsFileError::InvalidBusName(_)) => {}
+            _ => panic!("expected InvalidBusName; a bus name has been typo'd"),
+        }
+    }
+
+    // Settings::new()
+    #[test]
+    fn test_settings_new_invalid_bus_type_v1() {
+        let settings_str = r###"
+            {
+                "rules": [{
+                        "active_states": ["failed"],
+                        "bus_type": "sessionn",
+                        "expression": "syncthing.service",
+                        "expression_type": "unit name",
+                        "notifiers": ["desktop popup"]
+                }],
+                "notifiers": {
+                    "desktop popup": {
+                        "bus_name": "name.jerebear.KilljoyNotifierNotification1",
+                        "bus_type": "session"
+                    }
+                },
+                "version": 1
+            }
+        "###;
+        match Settings::new(settings_str.as_bytes()) {
+            Err(SettingsFileError::InvalidBusType(_)) => {}
+            _ => panic!("expected InvalidBusType; a bus type has been typo'd"),
+        }
+    }
+
+    // Settings::new()
+    #[test]
+    fn test_settings_new_invalid_bus_type_v2() {
+        let settings_str = r###"
+            {
+                "rules": [{
+                        "active_states": ["failed"],
+                        "bus_type": "session",
+                        "expression": "syncthing.service",
+                        "expression_type": "unit name",
+                        "notifiers": ["desktop popup"]
+                }],
+                "notifiers": {
+                    "desktop popup": {
+                        "bus_name": "name.jerebear.KilljoyNotifierNotification1",
+                        "bus_type": "sessionn"
+                    }
+                },
+                "version": 1
+            }
+        "###;
+        match Settings::new(settings_str.as_bytes()) {
+            Err(SettingsFileError::InvalidBusType(_)) => {}
+            _ => panic!("expected InvalidBusType; a bus type has been typo'd"),
+        }
+    }
+
+    // Settings::new()
+    #[test]
+    fn test_settings_new_invalid_expression_type() {
+        let settings_str = r###"
+            {
+                "rules": [{
+                        "active_states": ["failed"],
+                        "bus_type": "session",
+                        "expression": "syncthing.service",
+                        "expression_type": "unit namee",
+                        "notifiers": ["desktop popup"]
+                }],
+                "notifiers": {
+                    "desktop popup": {
+                        "bus_name": "name.jerebear.KilljoyNotifierNotification1",
+                        "bus_type": "session"
+                    }
+                },
+                "version": 1
+            }
+        "###;
+        match Settings::new(settings_str.as_bytes()) {
+            Err(SettingsFileError::InvalidExpressionType(_)) => {}
+            _ => panic!("expected InvalidExpressionType; an expression type has been typo'd"),
+        }
+    }
+
+    // Settings::new()
+    #[test]
+    fn test_settings_new_invalid_regex() {
+        let settings_str = r###"
+            {
+                "rules": [{
+                        "active_states": ["failed"],
+                        "bus_type": "session",
+                        "expression": "{",
+                        "expression_type": "regex",
+                        "notifiers": ["desktop popup"]
+                }],
+                "notifiers": {
+                    "desktop popup": {
+                        "bus_name": "name.jerebear.KilljoyNotifierNotification1",
+                        "bus_type": "session"
+                    }
+                },
+                "version": 1
+            }
+        "###;
+        match Settings::new(settings_str.as_bytes()) {
+            Err(SettingsFileError::InvalidRegex(_)) => {}
+            _ => panic!("expected InvalidRegex; a regex has been typo'd"),
+        }
+    }
+
+    // Settings::new()
+    #[test]
+    fn test_settings_new_invalid_notifier() {
+        let settings_str = r###"
+            {
+                "rules": [{
+                        "active_states": ["failed"],
+                        "bus_type": "session",
+                        "expression": "syncthing.service",
+                        "expression_type": "unit name",
+                        "notifiers": ["desktop popupp"]
+                }],
+                "notifiers": {
+                    "desktop popup": {
+                        "bus_name": "name.jerebear.KilljoyNotifierNotification1",
+                        "bus_type": "session"
+                    }
+                },
+                "version": 1
+            }
+        "###;
+        match Settings::new(settings_str.as_bytes()) {
+            Err(SettingsFileError::InvalidNotifier(_)) => {}
+            _ => panic!("expected InvalidNotifier; a notifier has been typo'd"),
+        }
     }
 }
