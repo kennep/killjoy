@@ -88,22 +88,16 @@ fn handle_settings_subcommand(args: &ArgMatches) {
 
 // Handle the 'settings load-path' subcommand.
 fn handle_settings_load_path_subcommand() {
-    let load_path = match settings::get_load_path() {
-        Ok(load_path) => load_path,
-        Err(err) => {
-            eprintln!("{}", err);
-            process::exit(1);
-        }
-    };
+    let load_path = settings::get_load_path().unwrap_or_else(|err| {
+        eprintln!("{}", err);
+        process::exit(1);
+    });
     println!("{}", load_path.as_path().display());
 }
 
 // Handle the 'settings validate' subcommand.
 fn handle_settings_validate_subcommand(args: &ArgMatches) {
-    let path = match args.value_of("path") {
-        Some(path_str) => Some(Path::new(path_str)),
-        None => None,
-    };
+    let path = args.value_of("path").map(|path_str| Path::new(path_str));
     get_settings_or_exit(path);
 }
 
@@ -144,27 +138,20 @@ fn handle_no_subcommand(loop_once: bool, loop_timeout: u32) {
 
 // Get and return a settings object, or print a message to stderr and exit with a non-zero code.
 fn get_settings_or_exit(path: Option<&Path>) -> Settings {
-    match settings::load(path) {
-        Ok(settings_obj) => settings_obj,
-        Err(err) => {
-            eprintln!("{}", err);
-            process::exit(1);
-        }
-    }
+    settings::load(path).unwrap_or_else(|err| {
+        eprintln!("{}", err);
+        process::exit(1);
+    })
 }
 
 // Get the `loop-timeout` argument, or kill this process.
 fn get_loop_timeout_or_exit(args: &ArgMatches) -> u32 {
     // It's safe to call expect(), because a default value is set in our arg parser.
-    let result = args
-        .value_of("loop-timeout")
-        .expect("Failed to get value of loop-timeout argument.")
-        .parse::<u32>();
-    match result {
-        Ok(val) => val,
-        Err(err) => {
+    args.value_of("loop-timeout")
+        .expect("Failed to get loop-timeout argument. Default should've been set in arg parser.")
+        .parse::<u32>()
+        .unwrap_or_else(|err| {
             eprintln!("Failed to parse argument loop-timeout: {}", err);
             process::exit(1);
-        }
-    }
+        })
 }
