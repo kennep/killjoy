@@ -262,7 +262,10 @@ impl BusWatcher {
 
             for matching_rule in &matching_rules {
                 for notifier_name in &matching_rule.notifiers {
-                    let notifier = self.settings.notifiers.get(notifier_name).unwrap();
+                    let notifier =
+                        self.settings.notifiers.get(notifier_name).expect(
+                            &format!("Failed to get notifier named '{}'", notifier_name)[..],
+                        );
 
                     let header_bus_name = notifier.get_bus_name();
                     let header_path = make_path_like_bus_name(&header_bus_name);
@@ -474,13 +477,24 @@ impl BusWatcher {
         unit_props: &HashMap<String, Variant<Box<RefArg + 'static>>>,
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) {
-        // Get ActiveState property.
-        let active_state_str: &str = unit_props.get("ActiveState").unwrap().0.as_str().unwrap();
-        let active_state = ActiveState::try_from(active_state_str).unwrap();
+        // Get ActiveState.
+        let active_state_str: &str = unit_props
+            .get("ActiveState")
+            .expect("Failed to get ActiveState property.")
+            .0
+            .as_str()
+            .expect("Failed to cast ActiveState property to a string.");
+        let active_state = ActiveState::try_from(active_state_str)
+            .expect(&format!("Failed to create ActiveState from '{}'", active_state_str)[..]);
 
         // Get timestamp at which ActiveState was last entered.
         let timestamp_key = get_timestamp_key(active_state);
-        let timestamp = unit_props.get(timestamp_key).unwrap().0.as_u64().unwrap();
+        let timestamp = unit_props
+            .get(timestamp_key)
+            .expect(&format!("Failed to get {} property", timestamp_key)[..])
+            .0
+            .as_u64()
+            .expect(&format!("Failed to cast {} property to a u64.", timestamp_key)[..]);
 
         // Upsert unit state machine.
         let on_change = self.gen_on_change(&unit_name);
@@ -597,10 +611,12 @@ fn make_path_like_bus_name(bus_name: &BusName) -> Path<'static> {
     let mut path_str = bus_name
         .as_cstr()
         .to_str()
-        .expect("Failed to create string from contents of BusName.")
+        .expect("Failed to create string from BusName.")
         .replace(".", "/");
     path_str.insert(0, '/');
-    Path::new(path_str).unwrap().to_owned()
+    Path::new(path_str)
+        .expect(&format!("Failed to convert bus name to path. Bus name: {}", bus_name)[..])
+        .to_owned()
 }
 
 // Tell whether at least one rule matches the given unit name.
@@ -610,20 +626,25 @@ fn rules_match_name(rules: &[&Rule], unit_name: &str) -> bool {
 
 // Wrap BUS_NAME_FOR_SYSTEMD.
 fn wrap_bus_name_for_systemd() -> BusName<'static> {
-    BusName::new(BUS_NAME_FOR_SYSTEMD).unwrap()
+    BusName::new(BUS_NAME_FOR_SYSTEMD)
+        .expect(&format!("Failed to create BusName from '{}'", BUS_NAME_FOR_SYSTEMD)[..])
 }
 
 // Wrap PATH_FOR_SYSTEMD.
 fn wrap_path_for_systemd() -> Path<'static> {
-    Path::new(PATH_FOR_SYSTEMD).unwrap()
+    Path::new(PATH_FOR_SYSTEMD)
+        .expect(&format!("Failed to create Path from '{}'", PATH_FOR_SYSTEMD)[..])
 }
 
 fn wrap_interface_for_killjoy_notifier() -> Interface<'static> {
-    Interface::new("name.jerebear.KilljoyNotifier1").unwrap()
+    let interface_str = "name.jerebear.KilljoyNotifier1";
+    Interface::new(interface_str)
+        .expect(&format!("Failed to create Interface from '{}'", interface_str)[..])
 }
 
 fn wrap_member_for_notify() -> Member<'static> {
-    Member::new("Notify").unwrap()
+    let member_str = "Notify";
+    Member::new(member_str).expect(&format!("Failed to create Member from '{}'", member_str)[..])
 }
 
 #[cfg(test)]
@@ -634,13 +655,14 @@ mod tests {
 
     #[test]
     fn test_make_path_like_bus_name() {
-        let bus_name = BusName::new("com.example.App1").unwrap();
+        let bus_name = BusName::new(BUS_NAME_FOR_SYSTEMD)
+            .expect(&format!("Failed to create BusName from {}", BUS_NAME_FOR_SYSTEMD)[..]);
         let path = make_path_like_bus_name(&bus_name);
         let path_str = path
             .as_cstr()
             .to_str()
-            .expect("Failed to create string from contents of Path.");
-        assert_eq!(path_str, "/com/example/App1");
+            .expect(&format!("Failed to create string from {}", path));
+        assert_eq!(path_str, "/org/freedesktop/systemd1");
     }
 
     // Let the unit name match zero of two rules.
@@ -757,6 +779,11 @@ mod tests {
 
     #[test]
     fn test_interface_for_systemd_unit() {
-        Interface::new(INTERFACE_FOR_SYSTEMD_UNIT).unwrap();
+        Interface::new(INTERFACE_FOR_SYSTEMD_UNIT).expect(
+            &format!(
+                "Failed to create Interface from {}",
+                INTERFACE_FOR_SYSTEMD_UNIT
+            )[..],
+        );
     }
 }

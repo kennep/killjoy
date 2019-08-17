@@ -161,35 +161,45 @@ mod tests {
     // Convert "activating" to an ActiveState.
     #[test]
     fn test_active_state_from_activating() {
-        let active_state = ActiveState::try_from("activating").unwrap();
+        let active_state_str = "activating";
+        let active_state = ActiveState::try_from(active_state_str)
+            .expect(&format!("Failed to create ActiveState from {}", active_state_str)[..]);
         assert_eq!(active_state, ActiveState::Activating);
     }
 
     // Convert "active" to an ActiveState.
     #[test]
     fn test_active_state_from_active() {
-        let active_state = ActiveState::try_from("active").unwrap();
+        let active_state_str = "active";
+        let active_state = ActiveState::try_from(active_state_str)
+            .expect(&format!("Failed to create ActiveState from {}", active_state_str)[..]);
         assert_eq!(active_state, ActiveState::Active);
     }
 
     // Convert "deactivating" to an ActiveState.
     #[test]
     fn test_active_state_from_deactivating() {
-        let active_state = ActiveState::try_from("deactivating").unwrap();
+        let active_state_str = "deactivating";
+        let active_state = ActiveState::try_from(active_state_str)
+            .expect(&format!("Failed to create ActiveState from {}", active_state_str)[..]);
         assert_eq!(active_state, ActiveState::Deactivating);
     }
 
     // Convert "failed" to an ActiveState.
     #[test]
     fn test_active_state_from_failed() {
-        let active_state = ActiveState::try_from("failed").unwrap();
+        let active_state_str = "failed";
+        let active_state = ActiveState::try_from(active_state_str)
+            .expect(&format!("Failed to create ActiveState from {}", active_state_str)[..]);
         assert_eq!(active_state, ActiveState::Failed);
     }
 
     // Convert "inactive" to an ActiveState.
     #[test]
     fn test_active_state_from_inactive() {
-        let active_state = ActiveState::try_from("inactive").unwrap();
+        let active_state_str = "inactive";
+        let active_state = ActiveState::try_from(active_state_str)
+            .expect(&format!("Failed to create ActiveState from {}", active_state_str)[..]);
         assert_eq!(active_state, ActiveState::Inactive);
     }
 

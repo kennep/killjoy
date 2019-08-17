@@ -424,7 +424,8 @@ mod tests {
     // Expression::UnitRegex::matches()
     #[test]
     fn test_expression_regex_matches() {
-        let expression = Expression::Regex(Regex::new(r"a\.service").unwrap());
+        let expression =
+            Expression::Regex(Regex::new(r"a\.service").expect("Failed to compile regex."));
         assert!(!expression.matches(".service"));
         assert!(expression.matches("a.service"));
         assert!(expression.matches("aa.service"));
