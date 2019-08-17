@@ -177,7 +177,7 @@ impl BusWatcher {
                 } else if let Some(msg_body) = UnitRemoved::from_message(&msg) {
                     self.handle_unit_removed(&msg_body, &mut unit_states);
                 } else if let Some(msg_body) = PropertiesChanged::from_message(&msg) {
-                    self.handle_properties_changed(&msg, &msg_body, &mut unit_states);
+                    self.handle_properties_changed(&msg, &msg_body, &mut unit_states)?;
                 } else {
                     eprintln!("Unexpected message received: {:?}", msg);
                 };
@@ -388,49 +388,73 @@ impl BusWatcher {
         msg: &Message,
         msg_body: &PropertiesChanged,
         unit_states: &mut HashMap<String, UnitStateMachine>,
-    ) {
-        // The properties we're interested in are exposed on org.freedesktop.systemd1.Unit.
+    ) -> Result<(), MyDBusError> {
+        // We only care about the properties exposed by this interface.
         if msg_body.interface != INTERFACE_FOR_SYSTEMD_UNIT {
-            return;
+            return Ok(());
         }
 
-        // Get the unit's ActiveState property. If ActiveState isn't in changed_properties, then no
-        // work needs to be done.
+        // Get ActiveState.
         let active_state: ActiveState = match msg_body.changed_properties.get("ActiveState") {
             Some(active_state_variant) => {
                 // active_state_variant: dbus::arg::Variant<Box<dbus::arg::RefArg + 'static>>
-                let active_state_str = active_state_variant.0.as_str().unwrap();
-                ActiveState::try_from(active_state_str).unwrap()
+                let active_state_str = active_state_variant.0.as_str().ok_or_else(|| {
+                    MyDBusError::new(String::from(
+                        "Failed to cast ActiveState D-Bus message field to a string.",
+                    ))
+                })?;
+                ActiveState::try_from(active_state_str).map_err(|_| {
+                    MyDBusError::new(format!(
+                        "Failed to interpret ActiveState D-Bus message argument: {}",
+                        active_state_str,
+                    ))
+                })?
             }
-            None => return,
+            None => return Ok(()),
         };
 
-        // Get the timestamp at which that state was last entered. If ActiveState changed, then we
-        // assume that the corresponding timestamp must be present.
-        let msg_path: Path = msg.path().expect("Failed to get path from signal headers.");
+        // Get the timestamp at which that state was last entered.
+        let msg_path: Path = msg.path().ok_or_else(|| {
+            MyDBusError::new("Failed to get object path from PropertiesChanged signal.".to_string())
+        })?;
         let timestamp_key = get_timestamp_key(active_state);
-        let timestamp: u64 = match msg_body.changed_properties.get(timestamp_key) {
-            Some(timestamp_variant) => timestamp_variant.0.as_u64().unwrap(),
-            None => panic!(format!(
-                "A PropertiesChanged signal was received, indicating that {:?} changed state to {:?}. However, the signal didn't include a corresponding timestamp named {}.",
-                msg_path, active_state, timestamp_key
-            )),
-        };
+        let timestamp: u64 = msg_body
+            .changed_properties
+            .get(timestamp_key)
+            .ok_or_else(|| {
+                MyDBusError::new(format!(
+                    "A PropertiesChanged signal indicates that {:?} changed to the {:?} state. However, the signal doesn't include a timestamp named {}.",
+                    msg_path, active_state, timestamp_key
+                ))
+            })?
+            .0
+            .as_u64()
+            .ok_or_else(|| MyDBusError::new(String::from(
+                "Failed to cast timestamp D-Bus message field to a u64."
+            )))?;
 
         // Translate the signal's path into a unit name.
-        let unit_id_result = self
+        //
+        // One can ask systemd for the properties of a fictitious unit, e.g.
+        // /org/freedesktop/systemd1/unit/dbusss_2eservice, and it will respond. Thus, we can rely
+        // on systemd to respond here.
+        let unit_name: String = self
             .get_conn_path(&msg_path)
-            .get(INTERFACE_FOR_SYSTEMD_UNIT, "Id");
-        let unit_name: String = match unit_id_result {
-            Ok(unit_id_variant) => unit_id_variant.0.as_str().unwrap().to_string(),
-            Err(err) => {
-                eprintln!(
-                    "Failed to get unit name for {:?}. State change may have been missed. Error: {}",
-                    msg_path, err
-                );
-                return;
-            }
-        };
+            .get(INTERFACE_FOR_SYSTEMD_UNIT, "Id")
+            .map_err(|dbus_err| {
+                MyDBusError::new(format!(
+                    "Failed to get unit name corresponding to {:?}. Cause: {}",
+                    msg_path, dbus_err
+                ))
+            })?
+            .0
+            .as_str()
+            .ok_or_else(|| {
+                MyDBusError::new(String::from(
+                    "Failed to cast D-Bus message field to a string.",
+                ))
+            })?
+            .to_string();
 
         // Update unit state machine.
         let on_change = self.gen_on_change(&unit_name);
@@ -438,6 +462,7 @@ impl BusWatcher {
             .entry(unit_name.clone())
             .and_modify(|usm| usm.update(active_state, timestamp, &on_change))
             .or_insert_with(|| UnitStateMachine::new(active_state, timestamp, &on_change));
+        Ok(())
     }
 
     // Upsert the state machines in `unit_states` as appropriate.
