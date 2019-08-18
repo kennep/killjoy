@@ -2,23 +2,16 @@
     "version": 1,
     "rules": [
         {
-            "active_states": ["activating", "active", "deactivating", "inactive", "failed"],
+            "active_states": ["failed"],
             "bus_type": "session",
-            "expression": "syncthing.service",
-            "expression_type": "unit name",
+            "expression": ".service",
+            "expression_type": "unit type",
             "notifiers": ["desktop popup"]
         },
         {
-            "active_states": ["activating", "active", "deactivating", "inactive", "failed"],
-            "bus_type": "session",
-            "expression": "dbus-org.freedesktop.Avahi.service",
-            "expression_type": "unit name",
-            "notifiers": ["desktop popup"]
-        },
-        {
-            "active_states": ["activating", "deactivating", "inactive", "failed"],
+            "active_states": ["failed"],
             "bus_type": "system",
-            "expression": ".mount",
+            "expression": ".service",
             "expression_type": "unit type",
             "notifiers": ["desktop popup"]
         }
