@@ -132,19 +132,19 @@ pub trait OrgFreedesktopDBusProperties {
         &self,
         interface: &str,
         property: &str,
-    ) -> Result<arg::Variant<Box<arg::RefArg + 'static>>, Self::Err>;
+    ) -> Result<arg::Variant<Box<dyn arg::RefArg + 'static>>, Self::Err>;
     fn get_all(
         &self,
         interface: &str,
     ) -> Result<
-        ::std::collections::HashMap<String, arg::Variant<Box<arg::RefArg + 'static>>>,
+        ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>,
         Self::Err,
     >;
     fn set(
         &self,
         interface: &str,
         property: &str,
-        value: arg::Variant<Box<arg::RefArg>>,
+        value: arg::Variant<Box<dyn arg::RefArg>>,
     ) -> Result<(), Self::Err>;
 }
 
@@ -157,7 +157,7 @@ impl<'a, C: ::std::ops::Deref<Target = dbus::Connection>> OrgFreedesktopDBusProp
         &self,
         interface: &str,
         property: &str,
-    ) -> Result<arg::Variant<Box<arg::RefArg + 'static>>, Self::Err> {
+    ) -> Result<arg::Variant<Box<dyn arg::RefArg + 'static>>, Self::Err> {
         let mut m = self.method_call_with_args(
             &"org.freedesktop.DBus.Properties".into(),
             &"Get".into(),
@@ -169,7 +169,7 @@ impl<'a, C: ::std::ops::Deref<Target = dbus::Connection>> OrgFreedesktopDBusProp
         )?;
         m.as_result()?;
         let mut i = m.iter_init();
-        let value: arg::Variant<Box<arg::RefArg + 'static>> = i.read()?;
+        let value: arg::Variant<Box<dyn arg::RefArg + 'static>> = i.read()?;
         Ok(value)
     }
 
@@ -177,7 +177,7 @@ impl<'a, C: ::std::ops::Deref<Target = dbus::Connection>> OrgFreedesktopDBusProp
         &self,
         interface: &str,
     ) -> Result<
-        ::std::collections::HashMap<String, arg::Variant<Box<arg::RefArg + 'static>>>,
+        ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>,
         Self::Err,
     > {
         let mut m = self.method_call_with_args(
@@ -192,7 +192,7 @@ impl<'a, C: ::std::ops::Deref<Target = dbus::Connection>> OrgFreedesktopDBusProp
         let mut i = m.iter_init();
         let properties: ::std::collections::HashMap<
             String,
-            arg::Variant<Box<arg::RefArg + 'static>>,
+            arg::Variant<Box<dyn arg::RefArg + 'static>>,
         > = i.read()?;
         Ok(properties)
     }
@@ -201,7 +201,7 @@ impl<'a, C: ::std::ops::Deref<Target = dbus::Connection>> OrgFreedesktopDBusProp
         &self,
         interface: &str,
         property: &str,
-        value: arg::Variant<Box<arg::RefArg>>,
+        value: arg::Variant<Box<dyn arg::RefArg>>,
     ) -> Result<(), Self::Err> {
         let mut m = self.method_call_with_args(
             &"org.freedesktop.DBus.Properties".into(),
@@ -269,7 +269,7 @@ where
         let mut i = minfo.msg.iter_init();
         let interface: &str = i.read()?;
         let property: &str = i.read()?;
-        let value: arg::Variant<Box<arg::RefArg>> = i.read()?;
+        let value: arg::Variant<Box<dyn arg::RefArg>> = i.read()?;
         let d = fclone(minfo);
         d.set(interface, property, value)?;
         let rm = minfo.msg.method_return();
@@ -292,7 +292,7 @@ where
 pub struct OrgFreedesktopDBusPropertiesPropertiesChanged {
     pub interface: String,
     pub changed_properties:
-        ::std::collections::HashMap<String, arg::Variant<Box<arg::RefArg + 'static>>>,
+        ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>,
     pub invalidated_properties: Vec<String>,
 }
 
@@ -368,7 +368,7 @@ pub trait OrgFreedesktopSystemd1Manager {
         &self,
         arg0: &str,
         arg1: bool,
-        arg2: Vec<(&str, arg::Variant<Box<arg::RefArg>>)>,
+        arg2: Vec<(&str, arg::Variant<Box<dyn arg::RefArg>>)>,
     ) -> Result<(), Self::Err>;
     fn ref_unit(&self, arg0: &str) -> Result<(), Self::Err>;
     fn unref_unit(&self, arg0: &str) -> Result<(), Self::Err>;
@@ -376,8 +376,8 @@ pub trait OrgFreedesktopSystemd1Manager {
         &self,
         arg0: &str,
         arg1: &str,
-        arg2: Vec<(&str, arg::Variant<Box<arg::RefArg>>)>,
-        arg3: Vec<(&str, Vec<(&str, arg::Variant<Box<arg::RefArg>>)>)>,
+        arg2: Vec<(&str, arg::Variant<Box<dyn arg::RefArg>>)>,
+        arg3: Vec<(&str, Vec<(&str, arg::Variant<Box<dyn arg::RefArg>>)>)>,
     ) -> Result<dbus::Path<'static>, Self::Err>;
     fn get_unit_processes(&self, arg0: &str) -> Result<Vec<(String, u32, String)>, Self::Err>;
     fn attach_processes_to_unit(
@@ -1017,7 +1017,7 @@ impl<'a, C: ::std::ops::Deref<Target = dbus::Connection>> OrgFreedesktopSystemd1
         &self,
         arg0: &str,
         arg1: bool,
-        arg2: Vec<(&str, arg::Variant<Box<arg::RefArg>>)>,
+        arg2: Vec<(&str, arg::Variant<Box<dyn arg::RefArg>>)>,
     ) -> Result<(), Self::Err> {
         let mut m = self.method_call_with_args(
             &"org.freedesktop.systemd1.Manager".into(),
@@ -1063,8 +1063,8 @@ impl<'a, C: ::std::ops::Deref<Target = dbus::Connection>> OrgFreedesktopSystemd1
         &self,
         arg0: &str,
         arg1: &str,
-        arg2: Vec<(&str, arg::Variant<Box<arg::RefArg>>)>,
-        arg3: Vec<(&str, Vec<(&str, arg::Variant<Box<arg::RefArg>>)>)>,
+        arg2: Vec<(&str, arg::Variant<Box<dyn arg::RefArg>>)>,
+        arg3: Vec<(&str, Vec<(&str, arg::Variant<Box<dyn arg::RefArg>>)>)>,
     ) -> Result<dbus::Path<'static>, Self::Err> {
         let mut m = self.method_call_with_args(
             &"org.freedesktop.systemd1.Manager".into(),
@@ -3190,7 +3190,7 @@ where
         let mut i = minfo.msg.iter_init();
         let arg0: &str = i.read()?;
         let arg1: bool = i.read()?;
-        let arg2: Vec<(&str, arg::Variant<Box<arg::RefArg>>)> = i.read()?;
+        let arg2: Vec<(&str, arg::Variant<Box<dyn arg::RefArg>>)> = i.read()?;
         let d = fclone(minfo);
         d.set_unit_properties(arg0, arg1, arg2)?;
         let rm = minfo.msg.method_return();
@@ -3233,8 +3233,8 @@ where
         let mut i = minfo.msg.iter_init();
         let arg0: &str = i.read()?;
         let arg1: &str = i.read()?;
-        let arg2: Vec<(&str, arg::Variant<Box<arg::RefArg>>)> = i.read()?;
-        let arg3: Vec<(&str, Vec<(&str, arg::Variant<Box<arg::RefArg>>)>)> = i.read()?;
+        let arg2: Vec<(&str, arg::Variant<Box<dyn arg::RefArg>>)> = i.read()?;
+        let arg3: Vec<(&str, Vec<(&str, arg::Variant<Box<dyn arg::RefArg>>)>)> = i.read()?;
         let d = fclone(minfo);
         let arg0 = d.start_transient_unit(arg0, arg1, arg2, arg3)?;
         let rm = minfo.msg.method_return();

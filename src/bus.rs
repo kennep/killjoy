@@ -199,7 +199,7 @@ impl BusWatcher {
     fn call_properties_get_all(
         &self,
         unit_path: &Path,
-    ) -> Result<HashMap<String, Variant<Box<RefArg + 'static>>>, MyDBusError> {
+    ) -> Result<HashMap<String, Variant<Box<dyn RefArg + 'static>>>, MyDBusError> {
         self.get_conn_path(unit_path)
             .get_all("org.freedesktop.systemd1.Unit")
             .map_err(|dbus_err: DBusError| {
@@ -474,7 +474,7 @@ impl BusWatcher {
     fn upsert_unit_states(
         &self,
         unit_name: &str,
-        unit_props: &HashMap<String, Variant<Box<RefArg + 'static>>>,
+        unit_props: &HashMap<String, Variant<Box<dyn RefArg + 'static>>>,
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) {
         // Get ActiveState.
