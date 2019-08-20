@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # coding=utf-8
-set -euo pipefail
+set -xeuo pipefail
 
 find scripts -type f -name '*.sh' -exec shellcheck '{}' ';'
 cargo check --locked --profile test
