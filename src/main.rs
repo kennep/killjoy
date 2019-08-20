@@ -1,5 +1,8 @@
 // Keep the following in sync with the readme.
 /*!
+ * **This application is in the early stages of development, and many features are absent or poorly
+ * tested. Read the following description with skepticism until this warning is removed.**
+ *
  * Killjoy is a [systemd] unit monitoring application.
  *
  * What is systemd?
