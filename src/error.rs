@@ -10,23 +10,14 @@ use serde_json::error::Error as SerdeJsonError;
 // An error used when working with a settings file.
 #[derive(Debug)]
 pub enum SettingsFileError {
-    // Failed to deserialize the settings file.
     DeserializationFailed(SerdeJsonError),
-    // Failed to find a settings file.
     FileNotFound(String),
-    // Failed to read settings file.
     FileNotReadable(IOError),
-    // The settings file included an invalid active state.
     InvalidActiveState(String),
-    // The settings file included an invalid bus name.
     InvalidBusName(String),
-    // The settings file included an invalid bus type.
     InvalidBusType(String),
-    // The settings file included an invalid expression type.
     InvalidExpressionType(String),
-    // A rule referenced a non-existent notifier.
     InvalidNotifier(String),
-    // The settings file included an invalid regex.
     InvalidRegex(RegexError),
 }
 
