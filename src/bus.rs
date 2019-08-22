@@ -370,13 +370,11 @@ impl BusWatcher {
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) {
         let borrowed_rules: Vec<&Rule> = self.settings.rules.iter().collect();
-        let unit_name = &msg_body.arg0;
+        let unit_name: &String = &msg_body.arg0;
+        let unit_path: &Path = &msg_body.arg1;
         if rules_match_name(&borrowed_rules, unit_name) {
-            if let Err(err) = self.unsubscribe_properties_changed(&unit_name) {
-                eprintln!(
-                    "Failed to unsubscribe from PropertiesChanged for {}: {}",
-                    unit_name, err
-                );
+            if let Err(err) = self.unsubscribe_properties_changed(&unit_path) {
+                panic!("Failed to handle UnitRemoved signal: {}", err);
             }
             Self::forget_unit_state(unit_name, unit_states);
         }
@@ -560,13 +558,19 @@ impl BusWatcher {
             })
     }
 
-    fn unsubscribe_properties_changed(&self, unit_name: &str) -> Result<(), DBusError> {
+    // Unsubscribe from the `org.freedesktop.DBus.Properties.PropertiesChanged` signal.
+    fn unsubscribe_properties_changed(&self, unit_path: &Path) -> Result<(), MyDBusError> {
         let bus_name = wrap_bus_name_for_systemd();
-        let path = self
-            .get_conn_path(&wrap_path_for_systemd())
-            .get_unit(unit_name)?;
-        let match_str = &PropertiesChanged::match_str(Some(&bus_name), Some(&path));
-        self.connection.remove_match(&match_str)
+        let match_str = &PropertiesChanged::match_str(Some(&bus_name), Some(&unit_path));
+        self.connection
+            .remove_match(&match_str)
+            .map(|_| ())
+            .map_err(|err| {
+                MyDBusError::new(format!(
+                    "Failed to remove match string {}: {}",
+                    match_str, err
+                ))
+            })
     }
 }
 
