@@ -369,9 +369,17 @@ impl BusWatcher {
         msg_body: &UnitRemoved,
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) {
+        let borrowed_rules: Vec<&Rule> = self.settings.rules.iter().collect();
         let unit_name = &msg_body.arg0;
-        self.unsubscribe_properties_changed_or_suppress(unit_name);
-        Self::forget_unit_state(unit_name, unit_states);
+        if rules_match_name(&borrowed_rules, unit_name) {
+            if let Err(err) = self.unsubscribe_properties_changed(&unit_name) {
+                eprintln!(
+                    "Failed to unsubscribe from PropertiesChanged for {}: {}",
+                    unit_name, err
+                );
+            }
+            Self::forget_unit_state(unit_name, unit_states);
+        }
     }
 
     // Handle the PropertiesChanged signal.
@@ -559,16 +567,6 @@ impl BusWatcher {
             .get_unit(unit_name)?;
         let match_str = &PropertiesChanged::match_str(Some(&bus_name), Some(&path));
         self.connection.remove_match(&match_str)
-    }
-
-    fn unsubscribe_properties_changed_or_suppress(&self, unit_name: &str) {
-        self.unsubscribe_properties_changed(&unit_name)
-            .unwrap_or_else(|err| {
-                eprintln!(
-                    "Failed to unsubscribe from PropertiesChanged for {}: {}",
-                    unit_name, err
-                )
-            });
     }
 }
 
