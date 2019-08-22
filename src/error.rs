@@ -95,20 +95,20 @@ impl Error for ParseAsActiveStateError {}
 // ManagerUnitNew, ManagerUnitRemoved, etc, so that the type system could communicate what went
 // wrong.
 #[derive(Debug)]
-pub struct MyDBusError {
+pub struct DBusError {
     msg: String,
 }
 
-impl MyDBusError {
+impl DBusError {
     pub fn new(msg: String) -> Self {
         Self { msg }
     }
 }
 
-impl Display for MyDBusError {
+impl Display for DBusError {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(f, "{}", self.msg)
     }
 }
 
-impl Error for MyDBusError {}
+impl Error for DBusError {}
