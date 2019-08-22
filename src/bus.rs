@@ -203,12 +203,10 @@ impl BusWatcher {
         self.get_conn_path(unit_path)
             .get_all("org.freedesktop.systemd1.Unit")
             .map_err(|dbus_err: DBusError| {
-                let my_dbus_err = MyDBusError::new(format!(
+                MyDBusError::new(format!(
                     "Failed to call org.freedesktop.DBus.Properties.GetAll: {}",
                     dbus_err
-                ));
-                eprintln!("{}", my_dbus_err);
-                my_dbus_err
+                ))
             })
     }
 
@@ -219,12 +217,10 @@ impl BusWatcher {
         self.get_conn_path(&wrap_path_for_systemd())
             .get_unit(unit_name)
             .map_err(|dbus_err: DBusError| {
-                let my_dbus_err = MyDBusError::new(format!(
+                MyDBusError::new(format!(
                     "Failed to call org.freedesktop.systemd1.Manager.GetUnit: {}",
                     dbus_err,
-                ));
-                eprintln!("{}", my_dbus_err);
-                my_dbus_err
+                ))
             })
     }
 
@@ -235,12 +231,10 @@ impl BusWatcher {
         self.get_conn_path(&wrap_path_for_systemd())
             .subscribe()
             .map_err(|dbus_err: DBusError| {
-                let my_dbus_err = MyDBusError::new(format!(
+                MyDBusError::new(format!(
                     "Failed to call org.freedesktop.systemd1.Manager.Subscribe: {}",
                     dbus_err
-                ));
-                eprintln!("{}", my_dbus_err);
-                my_dbus_err
+                ))
             })
     }
 
@@ -328,12 +322,10 @@ impl BusWatcher {
             .list_units()
             .map(|units| units.into_iter().map(|unit| unit.0).collect())
             .map_err(|dbus_err| {
-                let my_dbus_err = MyDBusError::new(format!(
+                MyDBusError::new(format!(
                     "Failed to call org.freedesktop.systemd1.Manager.ListUnits: {}",
                     dbus_err
-                ));
-                eprintln!("{}", my_dbus_err);
-                my_dbus_err
+                ))
             })
     }
 
@@ -514,12 +506,10 @@ impl BusWatcher {
         self.connection
             .add_match(&UnitNew::match_str(Some(&bus_name), Some(&path)))
             .map_err(|dbus_err: DBusError| {
-                let my_dbus_err = MyDBusError::new(format!(
+                MyDBusError::new(format!(
                     "Failed to subscribe to org.freedesktop.systemd1.Manager.UnitNew: {}",
                     dbus_err
-                ));
-                eprintln!("{}", my_dbus_err);
-                my_dbus_err
+                ))
             })
     }
 
@@ -530,12 +520,10 @@ impl BusWatcher {
         self.connection
             .add_match(&UnitRemoved::match_str(Some(&bus_name), Some(&path)))
             .map_err(|dbus_err: DBusError| {
-                let my_dbus_err = MyDBusError::new(format!(
+                MyDBusError::new(format!(
                     "Failed to subscribe to org.freedesktop.systemd1.Manager.UnitRemoved: {}",
                     dbus_err
-                ));
-                eprintln!("{}", my_dbus_err);
-                my_dbus_err
+                ))
             })
     }
 
@@ -546,12 +534,10 @@ impl BusWatcher {
         self.connection
             .add_match(&match_str)
             .map_err(|dbus_err: DBusError| {
-                let my_dbus_err = MyDBusError::new(format!(
+                MyDBusError::new(format!(
                     "Failed to subscribe to org.freedesktop.DBus.Properties.PropertiesChanged: {}",
                     dbus_err
-                ));
-                eprintln!("{}", my_dbus_err);
-                my_dbus_err
+                ))
             })
     }
 
