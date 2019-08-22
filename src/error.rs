@@ -106,7 +106,7 @@ pub enum DBusError {
     DecodeOrgFreedesktopSystemd1UnitActiveState(ParseAsActiveStateError),
     GetOrgFreedesktopSystemd1UnitId(String),
     MessageHasNoPath,
-    PropertiesChangedHasNoTimestamp(String, ActiveState, &'static str),
+    PropertiesLacksTimestamp(ActiveState, &'static str),
     RemoveMatch(String, String),
 }
 
@@ -146,10 +146,10 @@ impl Display for DBusError {
             DBusError::MessageHasNoPath => {
                 write!(f, "Failed to get path from message headers.")
             }
-            DBusError::PropertiesChangedHasNoTimestamp(unit_path, active_state, timestamp_key) => write!(
+            DBusError::PropertiesLacksTimestamp(active_state, timestamp_key) => write!(
                 f,
-                "A PropertiesChanged signal indicates that {} changed to the {:?} state. However, the signal doesn't include a timestamp named {}.",
-                unit_path, active_state, timestamp_key
+                "A unit has entered the {:?} state, but that unit's properties lack a timestamp named '{}'.",
+                active_state, timestamp_key
             ),
             DBusError::RemoveMatch(match_str, cause) => {
                 write!(f, "Failed to remove match string '{}': {}", match_str, cause)

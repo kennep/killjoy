@@ -399,22 +399,7 @@ impl BusWatcher {
         };
 
         // Get the timestamp at which that state was last entered.
-        let timestamp_key: &'static str = get_timestamp_key(active_state);
-        let timestamp: u64 = msg_body
-            .changed_properties
-            .get(timestamp_key)
-            .ok_or_else(|| {
-                CrateDBusError::PropertiesChangedHasNoTimestamp(
-                    format!("{}", unit_path),
-                    active_state,
-                    timestamp_key,
-                )
-            })?
-            .0
-            .as_u64()
-            .ok_or_else(|| {
-                CrateDBusError::CastOrgFreedesktopSystemd1UnitTimestamp(timestamp_key)
-            })?;
+        let timestamp: u64 = get_monotonic_timestamp(active_state, &msg_body.changed_properties)?;
 
         // Translate the signal's path into a unit name.
         //
@@ -459,13 +444,8 @@ impl BusWatcher {
             .expect(&format!("Failed to create ActiveState from '{}'", active_state_str)[..]);
 
         // Get timestamp at which ActiveState was last entered.
-        let timestamp_key = get_timestamp_key(active_state);
-        let timestamp = unit_props
-            .get(timestamp_key)
-            .expect(&format!("Failed to get {} property", timestamp_key)[..])
-            .0
-            .as_u64()
-            .expect(&format!("Failed to cast {} property to a u64.", timestamp_key)[..]);
+        let timestamp: u64 =
+            get_monotonic_timestamp(active_state, unit_props).expect("Failed to get timestamp.");
 
         // Upsert unit state machine.
         let on_change = self.gen_on_change(&unit_name);
@@ -537,8 +517,22 @@ fn get_rules_matching_active_state<'a>(rules: &[&'a Rule], target: ActiveState) 
         .collect()
 }
 
-// Return the D-Bus property indicating when the given state was most recently entered.
-fn get_timestamp_key(active_state: ActiveState) -> &'static str {
+// Return the timestamp indicating when the given state was most recently entered.
+fn get_monotonic_timestamp(
+    active_state: ActiveState,
+    unit_props: &HashMap<String, Variant<Box<dyn RefArg + 'static>>>,
+) -> Result<u64, CrateDBusError> {
+    let timestamp_key: &'static str = get_monotonic_timestamp_key(active_state);
+    unit_props
+        .get(timestamp_key)
+        .ok_or_else(|| CrateDBusError::PropertiesLacksTimestamp(active_state, timestamp_key))?
+        .0
+        .as_u64()
+        .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitTimestamp(timestamp_key))
+}
+
+// Return name of the monotonic timestamp indicating when the given state was most recently entered.
+fn get_monotonic_timestamp_key(active_state: ActiveState) -> &'static str {
     match active_state {
         ActiveState::Activating => "InactiveExitTimestampMonotonic",
         ActiveState::Active => "ActiveEnterTimestampMonotonic",
@@ -597,6 +591,20 @@ mod tests {
     use super::*;
 
     use crate::settings::{test_utils, Expression};
+
+    // get_monotonic_timestamp_key()
+    #[test]
+    fn test_get_monotonic_timestamp_key() {
+        for act_st in vec![
+            ActiveState::Activating,
+            ActiveState::Active,
+            ActiveState::Deactivating,
+            ActiveState::Failed,
+            ActiveState::Inactive,
+        ] {
+            assert!(get_monotonic_timestamp_key(act_st).contains("Monotonic"));
+        }
+    }
 
     #[test]
     fn test_make_path_like_bus_name() {
