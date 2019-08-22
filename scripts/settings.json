@@ -6,18 +6,18 @@
             "bus_type": "session",
             "expression": ".service",
             "expression_type": "unit type",
-            "notifiers": ["desktop popup"]
+            "notifiers": ["notification"]
         },
         {
             "active_states": ["failed"],
             "bus_type": "system",
             "expression": ".service",
             "expression_type": "unit type",
-            "notifiers": ["desktop popup"]
+            "notifiers": ["notification"]
         }
     ],
     "notifiers": {
-        "desktop popup": {
+        "notification": {
             "bus_type": "session",
             "bus_name": "name.jerebear.KilljoyNotifierNotification1"
         }
