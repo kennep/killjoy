@@ -347,12 +347,9 @@ impl BusWatcher {
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) -> Result<(), MyDBusError> {
         let borrowed_rules: Vec<&Rule> = self.settings.rules.iter().collect();
-        let unit_name = &msg_body.arg0;
+        let unit_name: &String = &msg_body.arg0;
+        let unit_path: &Path = &msg_body.arg1;
         if rules_match_name(&borrowed_rules, unit_name) {
-            let unit_path = match self.call_manager_get_unit(unit_name) {
-                Ok(unit_path) => unit_path,
-                Err(_) => return Ok(()),
-            };
             self.subscribe_properties_changed(&unit_path)?;
             let unit_props = match self.call_properties_get_all(&unit_path) {
                 Ok(unit_props) => unit_props,
