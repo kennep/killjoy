@@ -204,7 +204,7 @@ impl BusWatcher {
             .get_all("org.freedesktop.systemd1.Unit")
             .map_err(|dbus_err: DBusError| {
                 let my_dbus_err = MyDBusError::new(format!(
-                    "Failed to call org.freedesktop.DBus.Properties.GetAll. Cause: {}",
+                    "Failed to call org.freedesktop.DBus.Properties.GetAll: {}",
                     dbus_err
                 ));
                 eprintln!("{}", my_dbus_err);
@@ -220,7 +220,7 @@ impl BusWatcher {
             .get_unit(unit_name)
             .map_err(|dbus_err: DBusError| {
                 let my_dbus_err = MyDBusError::new(format!(
-                    "Failed to call org.freedesktop.systemd1.Manager.GetUnit. Cause: {}",
+                    "Failed to call org.freedesktop.systemd1.Manager.GetUnit: {}",
                     dbus_err,
                 ));
                 eprintln!("{}", my_dbus_err);
@@ -236,7 +236,7 @@ impl BusWatcher {
             .subscribe()
             .map_err(|dbus_err: DBusError| {
                 let my_dbus_err = MyDBusError::new(format!(
-                    "Failed to call org.freedesktop.systemd1.Manager.Subscribe. Cause: {}",
+                    "Failed to call org.freedesktop.systemd1.Manager.Subscribe: {}",
                     dbus_err
                 ));
                 eprintln!("{}", my_dbus_err);
@@ -329,7 +329,7 @@ impl BusWatcher {
             .map(|units| units.into_iter().map(|unit| unit.0).collect())
             .map_err(|dbus_err| {
                 let my_dbus_err = MyDBusError::new(format!(
-                    "Failed to call org.freedesktop.systemd1.Manager.ListUnits. Cause: {}",
+                    "Failed to call org.freedesktop.systemd1.Manager.ListUnits: {}",
                     dbus_err
                 ));
                 eprintln!("{}", my_dbus_err);
@@ -446,7 +446,7 @@ impl BusWatcher {
             .get(INTERFACE_FOR_SYSTEMD_UNIT, "Id")
             .map_err(|dbus_err| {
                 MyDBusError::new(format!(
-                    "Failed to get unit name corresponding to {:?}. Cause: {}",
+                    "Failed to get unit name corresponding to {:?}: {}",
                     msg_path, dbus_err
                 ))
             })?
@@ -512,7 +512,7 @@ impl BusWatcher {
             .add_match(&UnitNew::match_str(Some(&bus_name), Some(&path)))
             .map_err(|dbus_err: DBusError| {
                 let my_dbus_err = MyDBusError::new(format!(
-                    "Failed to subscribe to org.freedesktop.systemd1.Manager.UnitNew. Cause: {}",
+                    "Failed to subscribe to org.freedesktop.systemd1.Manager.UnitNew: {}",
                     dbus_err
                 ));
                 eprintln!("{}", my_dbus_err);
@@ -528,7 +528,7 @@ impl BusWatcher {
             .add_match(&UnitRemoved::match_str(Some(&bus_name), Some(&path)))
             .map_err(|dbus_err: DBusError| {
                 let my_dbus_err = MyDBusError::new(format!(
-                    "Failed to subscribe to org.freedesktop.systemd1.Manager.UnitRemoved. Cause: {}",
+                    "Failed to subscribe to org.freedesktop.systemd1.Manager.UnitRemoved: {}",
                     dbus_err
                 ));
                 eprintln!("{}", my_dbus_err);
@@ -540,14 +540,16 @@ impl BusWatcher {
     fn subscribe_properties_changed(&self, unit_path: &Path) -> Result<(), MyDBusError> {
         let bus_name = wrap_bus_name_for_systemd();
         let match_str = &PropertiesChanged::match_str(Some(&bus_name), Some(&unit_path));
-        self.connection.add_match(&match_str).map_err(|dbus_err: DBusError| {
+        self.connection
+            .add_match(&match_str)
+            .map_err(|dbus_err: DBusError| {
                 let my_dbus_err = MyDBusError::new(format!(
-                    "Failed to subscribe to org.freedesktop.DBus.Properties.PropertiesChanged. Cause: {}",
+                    "Failed to subscribe to org.freedesktop.DBus.Properties.PropertiesChanged: {}",
                     dbus_err
                 ));
                 eprintln!("{}", my_dbus_err);
                 my_dbus_err
-        })
+            })
     }
 
     fn unsubscribe_properties_changed(&self, unit_name: &str) -> Result<(), DBusError> {
