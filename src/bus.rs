@@ -202,11 +202,8 @@ impl BusWatcher {
     ) -> Result<HashMap<String, Variant<Box<dyn RefArg + 'static>>>, CrateDBusError> {
         self.get_conn_path(unit_path)
             .get_all("org.freedesktop.systemd1.Unit")
-            .map_err(|dbus_err: DBusError| {
-                CrateDBusError::new(format!(
-                    "Failed to call org.freedesktop.DBus.Properties.GetAll: {}",
-                    dbus_err
-                ))
+            .map_err(|err: DBusError| {
+                CrateDBusError::CallOrgFreedesktopDBusPropertiesGetAll(format!("{}", err))
             })
     }
 
@@ -216,11 +213,8 @@ impl BusWatcher {
     fn call_manager_get_unit(&self, unit_name: &str) -> Result<Path, CrateDBusError> {
         self.get_conn_path(&wrap_path_for_systemd())
             .get_unit(unit_name)
-            .map_err(|dbus_err: DBusError| {
-                CrateDBusError::new(format!(
-                    "Failed to call org.freedesktop.systemd1.Manager.GetUnit: {}",
-                    dbus_err,
-                ))
+            .map_err(|err: DBusError| {
+                CrateDBusError::CallOrgFreedesktopSystemd1ManagerGetUnit(format!("{}", err))
             })
     }
 
@@ -230,11 +224,8 @@ impl BusWatcher {
     fn call_manager_subscribe(&self) -> Result<(), CrateDBusError> {
         self.get_conn_path(&wrap_path_for_systemd())
             .subscribe()
-            .map_err(|dbus_err: DBusError| {
-                CrateDBusError::new(format!(
-                    "Failed to call org.freedesktop.systemd1.Manager.Subscribe: {}",
-                    dbus_err
-                ))
+            .map_err(|err: DBusError| {
+                CrateDBusError::CallOrgFreedesktopSystemd1ManagerSubscribe(format!("{}", err))
             })
     }
 
@@ -321,11 +312,8 @@ impl BusWatcher {
         self.get_conn_path(&wrap_path_for_systemd())
             .list_units()
             .map(|units| units.into_iter().map(|unit| unit.0).collect())
-            .map_err(|dbus_err| {
-                CrateDBusError::new(format!(
-                    "Failed to call org.freedesktop.systemd1.Manager.ListUnits: {}",
-                    dbus_err
-                ))
+            .map_err(|err| {
+                CrateDBusError::CallOrgFreedesktopSystemd1ManagerListUnits(format!("{}", err))
             })
     }
 
@@ -392,46 +380,41 @@ impl BusWatcher {
             return Ok(());
         }
 
-        // Get ActiveState.
+        // Get path of unit that changed.
+        let unit_path: Path = msg.path().ok_or_else(|| CrateDBusError::MessageHasNoPath)?;
+
+        // Get ActiveState of unit that changed.
         let active_state: ActiveState = match msg_body.changed_properties.get("ActiveState") {
             Some(active_state_variant) => {
                 // active_state_variant: dbus::arg::Variant<Box<dbus::arg::RefArg + 'static>>
-                let active_state_str = active_state_variant.0.as_str().ok_or_else(|| {
-                    CrateDBusError::new(String::from(
-                        "Failed to cast ActiveState D-Bus message field to a string.",
-                    ))
-                })?;
-                ActiveState::try_from(active_state_str).map_err(|_| {
-                    CrateDBusError::new(format!(
-                        "Failed to interpret ActiveState D-Bus message argument: {}",
-                        active_state_str,
-                    ))
+                let active_state_str = active_state_variant
+                    .0
+                    .as_str()
+                    .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitActiveState)?;
+                ActiveState::try_from(active_state_str).map_err(|err| {
+                    CrateDBusError::DecodeOrgFreedesktopSystemd1UnitActiveState(err)
                 })?
             }
             None => return Ok(()),
         };
 
         // Get the timestamp at which that state was last entered.
-        let msg_path: Path = msg.path().ok_or_else(|| {
-            CrateDBusError::new(
-                "Failed to get object path from PropertiesChanged signal.".to_string(),
-            )
-        })?;
-        let timestamp_key = get_timestamp_key(active_state);
+        let timestamp_key: &'static str = get_timestamp_key(active_state);
         let timestamp: u64 = msg_body
             .changed_properties
             .get(timestamp_key)
             .ok_or_else(|| {
-                CrateDBusError::new(format!(
-                    "A PropertiesChanged signal indicates that {:?} changed to the {:?} state. However, the signal doesn't include a timestamp named {}.",
-                    msg_path, active_state, timestamp_key
-                ))
+                CrateDBusError::PropertiesChangedHasNoTimestamp(
+                    format!("{}", unit_path),
+                    active_state,
+                    timestamp_key,
+                )
             })?
             .0
             .as_u64()
-            .ok_or_else(|| CrateDBusError::new(String::from(
-                "Failed to cast timestamp D-Bus message field to a u64."
-            )))?;
+            .ok_or_else(|| {
+                CrateDBusError::CastOrgFreedesktopSystemd1UnitTimestamp(timestamp_key)
+            })?;
 
         // Translate the signal's path into a unit name.
         //
@@ -439,21 +422,12 @@ impl BusWatcher {
         // /org/freedesktop/systemd1/unit/dbusss_2eservice, and it will respond. Thus, we can rely
         // on systemd to respond here.
         let unit_name: String = self
-            .get_conn_path(&msg_path)
+            .get_conn_path(&unit_path)
             .get(INTERFACE_FOR_SYSTEMD_UNIT, "Id")
-            .map_err(|dbus_err| {
-                CrateDBusError::new(format!(
-                    "Failed to get unit name corresponding to {:?}: {}",
-                    msg_path, dbus_err
-                ))
-            })?
+            .map_err(|err| CrateDBusError::GetOrgFreedesktopSystemd1UnitId(format!("{}", err)))?
             .0
             .as_str()
-            .ok_or_else(|| {
-                CrateDBusError::new(String::from(
-                    "Failed to cast D-Bus message field to a string.",
-                ))
-            })?
+            .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitId)?
             .to_string();
 
         // Update unit state machine.
@@ -505,57 +479,39 @@ impl BusWatcher {
     fn subscribe_manager_unit_new(&self) -> Result<(), CrateDBusError> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = wrap_path_for_systemd();
+        let match_str: String = UnitNew::match_str(Some(&bus_name), Some(&path));
         self.connection
-            .add_match(&UnitNew::match_str(Some(&bus_name), Some(&path)))
-            .map_err(|dbus_err: DBusError| {
-                CrateDBusError::new(format!(
-                    "Failed to subscribe to org.freedesktop.systemd1.Manager.UnitNew: {}",
-                    dbus_err
-                ))
-            })
+            .add_match(&match_str)
+            .map_err(|err: DBusError| CrateDBusError::AddMatch(match_str, format!("{}", err)))
     }
 
     // Subscribe to the `org.freedesktop.systemd1.Manager.UnitRemoved` signal.
     fn subscribe_manager_unit_removed(&self) -> Result<(), CrateDBusError> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = wrap_path_for_systemd();
+        let match_str: String = UnitRemoved::match_str(Some(&bus_name), Some(&path));
         self.connection
             .add_match(&UnitRemoved::match_str(Some(&bus_name), Some(&path)))
-            .map_err(|dbus_err: DBusError| {
-                CrateDBusError::new(format!(
-                    "Failed to subscribe to org.freedesktop.systemd1.Manager.UnitRemoved: {}",
-                    dbus_err
-                ))
-            })
+            .map_err(|err: DBusError| CrateDBusError::AddMatch(match_str, format!("{}", err)))
     }
 
     // Subscribe to the `org.freedesktop.DBus.Properties.PropertiesChanged` signal.
     fn subscribe_properties_changed(&self, unit_path: &Path) -> Result<(), CrateDBusError> {
         let bus_name = wrap_bus_name_for_systemd();
-        let match_str = &PropertiesChanged::match_str(Some(&bus_name), Some(&unit_path));
+        let match_str: String = PropertiesChanged::match_str(Some(&bus_name), Some(&unit_path));
         self.connection
             .add_match(&match_str)
-            .map_err(|dbus_err: DBusError| {
-                CrateDBusError::new(format!(
-                    "Failed to subscribe to org.freedesktop.DBus.Properties.PropertiesChanged: {}",
-                    dbus_err
-                ))
-            })
+            .map_err(|err: DBusError| CrateDBusError::AddMatch(match_str, format!("{}", err)))
     }
 
     // Unsubscribe from the `org.freedesktop.DBus.Properties.PropertiesChanged` signal.
     fn unsubscribe_properties_changed(&self, unit_path: &Path) -> Result<(), CrateDBusError> {
         let bus_name = wrap_bus_name_for_systemd();
-        let match_str = &PropertiesChanged::match_str(Some(&bus_name), Some(&unit_path));
+        let match_str: String = PropertiesChanged::match_str(Some(&bus_name), Some(&unit_path));
         self.connection
             .remove_match(&match_str)
             .map(|_| ())
-            .map_err(|err| {
-                CrateDBusError::new(format!(
-                    "Failed to remove match string {}: {}",
-                    match_str, err
-                ))
-            })
+            .map_err(|err: DBusError| CrateDBusError::RemoveMatch(match_str, format!("{}", err)))
     }
 }
 

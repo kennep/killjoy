@@ -4,6 +4,8 @@ use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::Error as IOError;
 
+use crate::unit::ActiveState;
+
 use regex::Error as RegexError;
 use serde_json::error::Error as SerdeJsonError;
 
@@ -88,26 +90,71 @@ impl Display for ParseAsActiveStateError {
 
 impl Error for ParseAsActiveStateError {}
 
-// Like dbus::Error, but implements Send.
+// Like dbus::Error, but with more granular semantics, and implements Send.
 //
-// This isn't a great way to handle errors. Doing this means that we don't know what went wrong,
-// except by inspecting the `msg` field. It would be nicer if e.g. we had an enum with variants like
-// ManagerUnitNew, ManagerUnitRemoved, etc, so that the type system could communicate what went
-// wrong.
+// TODO: Try carrying underlying dbus::Error as property.
 #[derive(Debug)]
-pub struct DBusError {
-    msg: String,
-}
-
-impl DBusError {
-    pub fn new(msg: String) -> Self {
-        Self { msg }
-    }
+pub enum DBusError {
+    AddMatch(String, String),
+    CallOrgFreedesktopDBusPropertiesGetAll(String),
+    CallOrgFreedesktopSystemd1ManagerGetUnit(String),
+    CallOrgFreedesktopSystemd1ManagerListUnits(String),
+    CallOrgFreedesktopSystemd1ManagerSubscribe(String),
+    CastOrgFreedesktopSystemd1UnitTimestamp(&'static str),
+    CastOrgFreedesktopSystemd1UnitActiveState,
+    CastOrgFreedesktopSystemd1UnitId,
+    DecodeOrgFreedesktopSystemd1UnitActiveState(ParseAsActiveStateError),
+    GetOrgFreedesktopSystemd1UnitId(String),
+    MessageHasNoPath,
+    PropertiesChangedHasNoTimestamp(String, ActiveState, &'static str),
+    RemoveMatch(String, String),
 }
 
 impl Display for DBusError {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        write!(f, "{}", self.msg)
+        match self {
+            DBusError::AddMatch(match_str, cause) => {
+                write!(f, "Failed to add match string '{}': {}", match_str, cause)
+            }
+            DBusError::CallOrgFreedesktopDBusPropertiesGetAll(cause) => {
+                write!(f, "Failed to call org.freedesktop.DBus.Properties.GetAll: {}", cause)
+            }
+            DBusError::CallOrgFreedesktopSystemd1ManagerGetUnit(cause) => {
+                write!(f, "Failed to call org.freedesktop.systemd1.Manager.GetUnit: {}", cause)
+            }
+            DBusError::CallOrgFreedesktopSystemd1ManagerListUnits(cause) => {
+                write!(f, "Failed to call org.freedesktop.systemd1.Manager.ListUnits: {}", cause)
+            }
+            DBusError::CallOrgFreedesktopSystemd1ManagerSubscribe(cause) => {
+                write!(f, "Failed to call org.freedesktop.systemd1.Manager.Subscribe: {}", cause)
+            }
+            DBusError::CastOrgFreedesktopSystemd1UnitTimestamp(timestamp_key) => {
+                write!(f, "Failed to cast org.freedesktop.systemd1.Unit.{} to a u64.", timestamp_key)
+            }
+            DBusError::CastOrgFreedesktopSystemd1UnitActiveState => {
+                write!(f, "Failed to cast org.freedesktop.systemd1.Unit.ActiveState to a string.")
+            }
+            DBusError::CastOrgFreedesktopSystemd1UnitId => {
+                write!(f, "Failed to cast org.freedesktop.systemd1.Unit.Id to a string.")
+            }
+            DBusError::DecodeOrgFreedesktopSystemd1UnitActiveState(cause) => {
+                write!(f, "Failed to decode org.freedesktop.systemd1.Unit.ActiveState: {}", cause)
+            }
+            DBusError::GetOrgFreedesktopSystemd1UnitId(cause) => {
+                write!(f, "Failed to get org.freedesktop.systemd1.Unit.Id for: {}", cause)
+            }
+            DBusError::MessageHasNoPath => {
+                write!(f, "Failed to get path from message headers.")
+            }
+            DBusError::PropertiesChangedHasNoTimestamp(unit_path, active_state, timestamp_key) => write!(
+                f,
+                "A PropertiesChanged signal indicates that {} changed to the {:?} state. However, the signal doesn't include a timestamp named {}.",
+                unit_path, active_state, timestamp_key
+            ),
+            DBusError::RemoveMatch(match_str, cause) => {
+                write!(f, "Failed to remove match string '{}': {}", match_str, cause)
+            }
+        }
     }
 }
 
