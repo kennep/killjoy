@@ -243,6 +243,7 @@ impl BusWatcher {
     fn gen_on_change<'a>(
         &'a self,
         unit_name: &'a str,
+        real_timestamp: u64,
     ) -> impl Fn(&UnitStateMachine, Option<ActiveState>) + 'a {
         move |usm: &UnitStateMachine, old_state: Option<ActiveState>| {
             let active_state = usm.active_state();
@@ -262,7 +263,7 @@ impl BusWatcher {
                     let header_interface = wrap_interface_for_killjoy_notifier();
                     let header_member = wrap_member_for_notify();
 
-                    let body_timestamp = usm.timestamp();
+                    let body_timestamp = real_timestamp;
                     let body_unit_name = &unit_name;
                     // order from newest to oldest
                     let mut body_active_states: Vec<String> = vec![String::from(active_state)];
@@ -422,14 +423,15 @@ impl BusWatcher {
     ) -> Result<(), CrateDBusError> {
         // Get unit's current ActiveState, and time at which it entered that state.
         let active_state: ActiveState = get_active_state(&unit_props)?;
-        let timestamp: u64 = get_monotonic_timestamp(active_state, unit_props)?;
+        let mono_timestamp: u64 = get_monotonic_timestamp(active_state, unit_props)?;
+        let real_timestamp: u64 = get_realtime_timestamp(active_state, unit_props)?;
 
         // Upsert unit state machine.
-        let on_change = self.gen_on_change(&unit_name);
+        let on_change = self.gen_on_change(&unit_name, real_timestamp);
         unit_states
             .entry(unit_name.to_string())
-            .and_modify(|usm| usm.update(active_state, timestamp, &on_change))
-            .or_insert_with(|| UnitStateMachine::new(active_state, timestamp, &on_change));
+            .and_modify(|usm| usm.update(active_state, mono_timestamp, &on_change))
+            .or_insert_with(|| UnitStateMachine::new(active_state, mono_timestamp, &on_change));
         Ok(())
     }
 
@@ -495,7 +497,7 @@ fn get_rules_matching_active_state<'a>(rules: &[&'a Rule], target: ActiveState) 
         .collect()
 }
 
-// Return the timestamp indicating when the given state was most recently entered.
+// Return the monotonic timestamp indicating when the given state was most recently entered.
 fn get_monotonic_timestamp(
     active_state: ActiveState,
     unit_props: &UnitProps,
@@ -517,6 +519,31 @@ fn get_monotonic_timestamp_key(active_state: ActiveState) -> &'static str {
         ActiveState::Deactivating => "ActiveExitTimestampMonotonic",
         ActiveState::Failed => "InactiveEnterTimestampMonotonic",
         ActiveState::Inactive => "InactiveEnterTimestampMonotonic",
+    }
+}
+
+// Return the realtime timestamp indicating when the given state was most recently entered.
+fn get_realtime_timestamp(
+    active_state: ActiveState,
+    unit_props: &UnitProps,
+) -> Result<u64, CrateDBusError> {
+    let timestamp_key: &'static str = get_realtime_timestamp_key(active_state);
+    unit_props
+        .get(timestamp_key)
+        .ok_or_else(|| CrateDBusError::PropertiesLacksTimestamp(active_state, timestamp_key))?
+        .0
+        .as_u64()
+        .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitTimestamp(timestamp_key))
+}
+
+// Return name of the realtime timestamp indicating when the given state was most recently entered.
+fn get_realtime_timestamp_key(active_state: ActiveState) -> &'static str {
+    match active_state {
+        ActiveState::Activating => "InactiveExitTimestamp",
+        ActiveState::Active => "ActiveEnterTimestamp",
+        ActiveState::Deactivating => "ActiveExitTimestamp",
+        ActiveState::Failed => "InactiveEnterTimestamp",
+        ActiveState::Inactive => "InactiveEnterTimestamp",
     }
 }
 
@@ -593,6 +620,20 @@ mod tests {
             ActiveState::Inactive,
         ] {
             assert!(get_monotonic_timestamp_key(act_st).contains("Monotonic"));
+        }
+    }
+
+    // get_realtime_timestamp_key()
+    #[test]
+    fn test_get_realtime_timestamp_key() {
+        for act_st in vec![
+            ActiveState::Activating,
+            ActiveState::Active,
+            ActiveState::Deactivating,
+            ActiveState::Failed,
+            ActiveState::Inactive,
+        ] {
+            assert!(!get_realtime_timestamp_key(act_st).contains("Monotonic"));
         }
     }
 
