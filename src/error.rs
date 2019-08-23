@@ -106,6 +106,7 @@ pub enum DBusError {
     DecodeOrgFreedesktopSystemd1UnitActiveState(ParseAsActiveStateError),
     GetOrgFreedesktopSystemd1UnitId(String),
     MessageLacksPath,
+    PropertiesLacksActiveState,
     PropertiesLacksTimestamp(ActiveState, &'static str),
     RemoveMatch(String, String),
 }
@@ -145,6 +146,9 @@ impl Display for DBusError {
             }
             DBusError::MessageLacksPath => {
                 write!(f, "Failed to get path from message headers.")
+            }
+            DBusError::PropertiesLacksActiveState => {
+                write!(f, "A unit's properties lacks the ActiveState property.")
             }
             DBusError::PropertiesLacksTimestamp(active_state, timestamp_key) => write!(
                 f,

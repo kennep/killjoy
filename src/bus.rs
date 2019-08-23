@@ -387,22 +387,15 @@ impl BusWatcher {
         // Get path of unit that changed.
         let unit_path: Path = msg.path().ok_or_else(|| CrateDBusError::MessageLacksPath)?;
 
-        // Get ActiveState of unit that changed.
-        let active_state: ActiveState = match msg_body.changed_properties.get("ActiveState") {
-            Some(active_state_variant) => {
-                // active_state_variant: dbus::arg::Variant<Box<dbus::arg::RefArg + 'static>>
-                let active_state_str = active_state_variant
-                    .0
-                    .as_str()
-                    .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitActiveState)?;
-                ActiveState::try_from(active_state_str).map_err(|err| {
-                    CrateDBusError::DecodeOrgFreedesktopSystemd1UnitActiveState(err)
-                })?
-            }
-            None => return Ok(()),
+        // Get unit's current ActiveState, and time at which it entered that state. If the
+        // ActiveState property is missing, assume it didn't change.
+        let active_state: ActiveState = match get_active_state(&msg_body.changed_properties) {
+            Ok(active_state) => active_state,
+            Err(err) => match err {
+                CrateDBusError::PropertiesLacksActiveState => return Ok(()),
+                _ => return Err(err),
+            },
         };
-
-        // Get the timestamp at which that state was last entered.
         let timestamp: u64 = get_monotonic_timestamp(active_state, &msg_body.changed_properties)?;
 
         // Translate the signal's path into a unit name.
@@ -437,17 +430,9 @@ impl BusWatcher {
         unit_props: &UnitProps,
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) {
-        // Get ActiveState.
-        let active_state_str: &str = unit_props
-            .get("ActiveState")
-            .expect("Failed to get ActiveState property.")
-            .0
-            .as_str()
-            .expect("Failed to cast ActiveState property to a string.");
-        let active_state = ActiveState::try_from(active_state_str)
-            .expect(&format!("Failed to create ActiveState from '{}'", active_state_str)[..]);
-
-        // Get timestamp at which ActiveState was last entered.
+        // Get unit's current ActiveState, and time at which it entered that state.
+        let active_state: ActiveState = get_active_state(&unit_props)
+            .expect("Failed to get or decode unit's ActiveState property.");
         let timestamp: u64 =
             get_monotonic_timestamp(active_state, unit_props).expect("Failed to get timestamp.");
 
@@ -544,6 +529,18 @@ fn get_monotonic_timestamp_key(active_state: ActiveState) -> &'static str {
         ActiveState::Failed => "InactiveEnterTimestampMonotonic",
         ActiveState::Inactive => "InactiveEnterTimestampMonotonic",
     }
+}
+
+// Return the value of the ActiveState property.
+fn get_active_state(unit_props: &UnitProps) -> Result<ActiveState, CrateDBusError> {
+    let active_state_str: &str = unit_props
+        .get("ActiveState")
+        .ok_or_else(|| CrateDBusError::PropertiesLacksActiveState)?
+        .0
+        .as_str()
+        .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitActiveState)?;
+    ActiveState::try_from(active_state_str)
+        .map_err(CrateDBusError::DecodeOrgFreedesktopSystemd1UnitActiveState)
 }
 
 // Given a bus name foo.bar.Biz1, make path /foo/bar/Biz1.
