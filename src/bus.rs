@@ -22,6 +22,10 @@ const BUS_NAME_FOR_SYSTEMD: &str = "org.freedesktop.systemd1";
 const PATH_FOR_SYSTEMD: &str = "/org/freedesktop/systemd1";
 const INTERFACE_FOR_SYSTEMD_UNIT: &str = "org.freedesktop.systemd1.Unit";
 
+// A unit's properties, as returned by a PropertiesChanged signal, or a call to
+// org.freedesktop.systemd1.Unit.GetAll.
+type UnitProps = HashMap<String, Variant<Box<dyn RefArg + 'static>>>;
+
 // Watch units appear and disappear on a bus, and take actions in response.
 pub struct BusWatcher {
     loop_once: bool,
@@ -430,7 +434,7 @@ impl BusWatcher {
     fn upsert_unit_states(
         &self,
         unit_name: &str,
-        unit_props: &HashMap<String, Variant<Box<dyn RefArg + 'static>>>,
+        unit_props: &UnitProps,
         unit_states: &mut HashMap<String, UnitStateMachine>,
     ) {
         // Get ActiveState.
@@ -520,7 +524,7 @@ fn get_rules_matching_active_state<'a>(rules: &[&'a Rule], target: ActiveState) 
 // Return the timestamp indicating when the given state was most recently entered.
 fn get_monotonic_timestamp(
     active_state: ActiveState,
-    unit_props: &HashMap<String, Variant<Box<dyn RefArg + 'static>>>,
+    unit_props: &UnitProps,
 ) -> Result<u64, CrateDBusError> {
     let timestamp_key: &'static str = get_monotonic_timestamp_key(active_state);
     unit_props
