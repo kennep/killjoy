@@ -389,17 +389,6 @@ impl BusWatcher {
         // Get path of unit that changed.
         let unit_path: Path = msg.path().ok_or_else(|| CrateDBusError::MessageLacksPath)?;
 
-        // Get unit's current ActiveState, and time at which it entered that state. If the
-        // ActiveState property is missing, assume it didn't change.
-        let active_state: ActiveState = match get_active_state(&msg_body.changed_properties) {
-            Ok(active_state) => active_state,
-            Err(err) => match err {
-                CrateDBusError::PropertiesLacksActiveState => return Ok(()),
-                _ => return Err(err),
-            },
-        };
-        let timestamp: u64 = get_monotonic_timestamp(active_state, &msg_body.changed_properties)?;
-
         // Translate the signal's path into a unit name.
         //
         // One can ask systemd for the properties of a fictitious unit, e.g.
@@ -414,13 +403,14 @@ impl BusWatcher {
             .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitId)?
             .to_string();
 
-        // Update unit state machine.
-        let on_change = self.gen_on_change(&unit_name);
-        unit_states
-            .entry(unit_name.clone())
-            .and_modify(|usm| usm.update(active_state, timestamp, &on_change))
-            .or_insert_with(|| UnitStateMachine::new(active_state, timestamp, &on_change));
-        Ok(())
+        // If the ActiveState property is missing, assume it didn't change.
+        match self.upsert_unit_states(&unit_name[..], &msg_body.changed_properties, unit_states) {
+            Ok(_) => Ok(()),
+            Err(err) => match err {
+                CrateDBusError::PropertiesLacksActiveState => Ok(()),
+                _ => Err(err),
+            },
+        }
     }
 
     // Upsert the state machines in `unit_states` as appropriate.
