@@ -105,7 +105,7 @@ pub enum DBusError {
     CastOrgFreedesktopSystemd1UnitId,
     DecodeOrgFreedesktopSystemd1UnitActiveState(ParseAsActiveStateError),
     GetOrgFreedesktopSystemd1UnitId(String),
-    MessageHasNoPath,
+    MessageLacksPath,
     PropertiesLacksTimestamp(ActiveState, &'static str),
     RemoveMatch(String, String),
 }
@@ -143,7 +143,7 @@ impl Display for DBusError {
             DBusError::GetOrgFreedesktopSystemd1UnitId(cause) => {
                 write!(f, "Failed to get org.freedesktop.systemd1.Unit.Id for: {}", cause)
             }
-            DBusError::MessageHasNoPath => {
+            DBusError::MessageLacksPath => {
                 write!(f, "Failed to get path from message headers.")
             }
             DBusError::PropertiesLacksTimestamp(active_state, timestamp_key) => write!(

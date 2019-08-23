@@ -381,7 +381,7 @@ impl BusWatcher {
         }
 
         // Get path of unit that changed.
-        let unit_path: Path = msg.path().ok_or_else(|| CrateDBusError::MessageHasNoPath)?;
+        let unit_path: Path = msg.path().ok_or_else(|| CrateDBusError::MessageLacksPath)?;
 
         // Get ActiveState of unit that changed.
         let active_state: ActiveState = match msg_body.changed_properties.get("ActiveState") {
