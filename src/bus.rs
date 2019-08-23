@@ -168,7 +168,8 @@ impl BusWatcher {
                         Ok(unit_props) => unit_props,
                         Err(_) => continue,
                     };
-                    self.upsert_unit_states(&unit_name, &unit_props, &mut unit_states);
+                    self.upsert_unit_states(&unit_name, &unit_props, &mut unit_states)
+                        .expect("Failed to upsert '{}' into map of unit state machines.");
                 }
             }
         }
@@ -339,7 +340,8 @@ impl BusWatcher {
                 Ok(unit_props) => unit_props,
                 Err(_) => return Ok(()),
             };
-            self.upsert_unit_states(unit_name, &unit_props, unit_states);
+            self.upsert_unit_states(unit_name, &unit_props, unit_states)
+                .expect("Failed to upsert '{}' into map of unit state machines.");
         }
         Ok(())
     }
@@ -422,19 +424,15 @@ impl BusWatcher {
     }
 
     // Upsert the state machines in `unit_states` as appropriate.
-    //
-    // If an error occurs while decoding `unit_props`, this method will panic.
     fn upsert_unit_states(
         &self,
         unit_name: &str,
         unit_props: &UnitProps,
         unit_states: &mut HashMap<String, UnitStateMachine>,
-    ) {
+    ) -> Result<(), CrateDBusError> {
         // Get unit's current ActiveState, and time at which it entered that state.
-        let active_state: ActiveState = get_active_state(&unit_props)
-            .expect("Failed to get or decode unit's ActiveState property.");
-        let timestamp: u64 =
-            get_monotonic_timestamp(active_state, unit_props).expect("Failed to get timestamp.");
+        let active_state: ActiveState = get_active_state(&unit_props)?;
+        let timestamp: u64 = get_monotonic_timestamp(active_state, unit_props)?;
 
         // Upsert unit state machine.
         let on_change = self.gen_on_change(&unit_name);
@@ -442,6 +440,7 @@ impl BusWatcher {
             .entry(unit_name.to_string())
             .and_modify(|usm| usm.update(active_state, timestamp, &on_change))
             .or_insert_with(|| UnitStateMachine::new(active_state, timestamp, &on_change));
+        Ok(())
     }
 
     // Subscribe to the `org.freedesktop.systemd1.Manager.UnitNew` signal.
