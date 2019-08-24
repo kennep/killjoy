@@ -56,6 +56,7 @@ mod cli;
 mod error;
 mod generated;
 mod settings;
+mod timestamp;
 mod unit;
 
 use std::path::Path;
