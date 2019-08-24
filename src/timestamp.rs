@@ -4,11 +4,23 @@ use crate::bus::UnitProps;
 use crate::error::DBusError as CrateDBusError;
 use crate::unit::ActiveState;
 
+// The number of usec since an arbitrary point in the past.
+//
+// For details, research `CLOCK_MONOTONIC`.
+#[derive(Clone, Debug)]
+pub struct MonotonicTimestamp(pub u64);
+
+// The number of usec since the epoch.
+//
+// For details, research `CLOCK_REALTIME`.
+#[derive(Debug)]
+pub struct RealtimeTimestamp(pub u64);
+
 // Return the monotonic timestamp indicating when the given state was most recently entered.
 pub fn get_monotonic_timestamp(
     active_state: ActiveState,
     unit_props: &UnitProps,
-) -> Result<u64, CrateDBusError> {
+) -> Result<MonotonicTimestamp, CrateDBusError> {
     let timestamp_key: &'static str = get_monotonic_timestamp_key(active_state);
     unit_props
         .get(timestamp_key)
@@ -16,6 +28,7 @@ pub fn get_monotonic_timestamp(
         .0
         .as_u64()
         .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitTimestamp(timestamp_key))
+        .map(MonotonicTimestamp)
 }
 
 // Return name of the monotonic timestamp indicating when the given state was most recently entered.
@@ -33,7 +46,7 @@ fn get_monotonic_timestamp_key(active_state: ActiveState) -> &'static str {
 pub fn get_realtime_timestamp(
     active_state: ActiveState,
     unit_props: &UnitProps,
-) -> Result<u64, CrateDBusError> {
+) -> Result<RealtimeTimestamp, CrateDBusError> {
     let timestamp_key: &'static str = get_realtime_timestamp_key(active_state);
     unit_props
         .get(timestamp_key)
@@ -41,6 +54,7 @@ pub fn get_realtime_timestamp(
         .0
         .as_u64()
         .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitTimestamp(timestamp_key))
+        .map(RealtimeTimestamp)
 }
 
 // Return name of the realtime timestamp indicating when the given state was most recently entered.

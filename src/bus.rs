@@ -17,6 +17,7 @@ use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1ManagerUni
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1ManagerUnitRemoved as UnitRemoved;
 use crate::settings::{Rule, Settings};
 use crate::timestamp;
+use crate::timestamp::RealtimeTimestamp;
 use crate::unit::{ActiveState, UnitStateMachine};
 
 const BUS_NAME_FOR_SYSTEMD: &str = "org.freedesktop.systemd1";
@@ -244,7 +245,7 @@ impl BusWatcher {
     fn gen_on_change<'a>(
         &'a self,
         unit_name: &'a str,
-        real_timestamp: u64,
+        real_ts: RealtimeTimestamp,
     ) -> impl Fn(&UnitStateMachine, Option<ActiveState>) + 'a {
         move |usm: &UnitStateMachine, old_state: Option<ActiveState>| {
             let active_state = usm.active_state();
@@ -264,7 +265,7 @@ impl BusWatcher {
                     let header_interface = wrap_interface_for_killjoy_notifier();
                     let header_member = wrap_member_for_notify();
 
-                    let body_timestamp = real_timestamp;
+                    let body_timestamp = real_ts.0;
                     let body_unit_name = &unit_name;
                     // order from newest to oldest
                     let mut body_active_states: Vec<String> = vec![String::from(active_state)];
@@ -424,15 +425,15 @@ impl BusWatcher {
     ) -> Result<(), CrateDBusError> {
         // Get unit's current ActiveState, and time at which it entered that state.
         let active_state: ActiveState = get_active_state(&unit_props)?;
-        let mono_timestamp: u64 = timestamp::get_monotonic_timestamp(active_state, unit_props)?;
-        let real_timestamp: u64 = timestamp::get_realtime_timestamp(active_state, unit_props)?;
+        let real_ts = timestamp::get_realtime_timestamp(active_state, unit_props)?;
+        let mono_ts = timestamp::get_monotonic_timestamp(active_state, unit_props)?;
 
         // Upsert unit state machine.
-        let on_change = self.gen_on_change(&unit_name, real_timestamp);
+        let on_change = self.gen_on_change(&unit_name, real_ts);
         unit_states
             .entry(unit_name.to_string())
-            .and_modify(|usm| usm.update(active_state, mono_timestamp, &on_change))
-            .or_insert_with(|| UnitStateMachine::new(active_state, mono_timestamp, &on_change));
+            .and_modify(|usm| usm.update(active_state, mono_ts.clone(), &on_change))
+            .or_insert_with(|| UnitStateMachine::new(active_state, mono_ts.clone(), &on_change));
         Ok(())
     }
 
