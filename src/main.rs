@@ -152,7 +152,12 @@ fn get_settings_or_exit(path: Option<&Path>) -> Settings {
 fn get_loop_timeout_or_exit(args: &ArgMatches) -> u32 {
     // It's safe to call expect(), because a default value is set in our arg parser.
     args.value_of("loop-timeout")
-        .expect("Failed to get loop-timeout argument. Default should've been set in arg parser.")
+        .unwrap_or_else(|| {
+            eprintln!(
+                "Failed to get loop-timeout argument. Default should've been set in arg parser."
+            );
+            process::exit(1);
+        })
         .parse::<u32>()
         .unwrap_or_else(|err| {
             eprintln!("Failed to parse argument loop-timeout: {}", err);
