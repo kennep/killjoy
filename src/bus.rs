@@ -185,9 +185,8 @@ impl BusWatcher {
                     self.handle_unit_removed(&msg_body, &mut unit_states);
                 } else if let Some(msg_body) = PropertiesChanged::from_message(&msg) {
                     self.handle_properties_changed(&msg, &msg_body, &mut unit_states)?;
-                } else {
-                    eprintln!("Unexpected message received: {:?}", msg);
                 };
+                // We don't care about other messages. We could log them at a low-level priority.
             }
             if self.loop_once {
                 return Ok(());
