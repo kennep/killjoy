@@ -1,51 +1,161 @@
 // Keep the following in sync with the readme.
 /*!
- * **This application is in the early stages of development, and many features are absent or poorly
- * tested. Read the following description with skepticism until this warning is removed.**
+ * killjoy is a systemd unit monitoring application.
  *
- * Killjoy is a [systemd] unit monitoring application.
+ * Concepts
+ * --------
  *
- * What is systemd?
+ * To understand killjoy, one must first understand systemd:
  *
  * > systemd is a suite of basic building blocks for a Linux system. It provides a system and
  * > service manager that runs as PID 1 and starts the rest of the system.
+ * >
+ * > — [systemd]
  *
- * Units are the resources that systemd knows how to manage. For example, the unit corresponding to
- * the nginx web server might be `nginx.service`, and the unit corresponding to the `/boot` mount
- * point might be `boot.mount`, though naming can vary per Linux distribution.
+ * Units are the resources that systemd knows how to manage. For example, here are several units
+ * which might be present on a host, and the resources they represent:
  *
- * Killjoy watches for a configurable list of events, such as "`nginx.service` failed," or
- * "`my-backup.service` is activating, active, or deactivating." Killjoy responds to these events by
- * reaching out across a D-Bus and contacting a configurable list of notifiers. In turn, the
- * notifiers are responsible for generating desktop pop-ups, sending emails, or otherwise taking
- * action.
+ * * `nginx.service`: Lightweight HTTP server and IMAP/POP3 proxy server
+ * * `logrotate.service`: Rotate log files
+ * * `logrotate.timer`: Rotate log files daily (i.e. periodically trigger `logrotate.service`)
+ * * `boot.mount`: The `/boot` mount point
  *
- * A small number of notifiers are developed alongside killjoy. However, the clear separation
- * between the watcher (killjoy) and the notifiers means that anyone can write and distribute a
- * custom notifier at any time, with no changes to killjoy itself. Want to start the WiFi coffee
- * maker when the daily backup service kicks off? Go for it.
+ * This list of units is small; a host can have many hundreds of units, of eleven different types.
  *
- * Killjoy is inspired by [sagbescheid], [SystemdMon], [pynagsystemd], and [`OnFailure=`], but there
- * are differences in efficiency, reliability, features, and flexibility. Killjoy assumes knowledge
- * of [systemd]. For additional information, see [systemd(1)], especially the section on [concepts].
+ * There can be multiple systemd instances running on a host at a given time. Typically, there is
+ * one system-wide instance, and one instance per logged-in user. Each systemd instance maintains
+ * distinct units.
  *
- * Dependencies
+ * When killjoy starts, it reads a list of rules, where each rule declares units that killjoy should
+ * watch. For example, rules might state:
+ *
+ * * Connect to the system bus and watch `nginx.service`. If it enters the "failed" state, contact
+ *   the "logfile" notifier.
+ * * Connect to the session bus and watch all `.timer` units. If any enter the "active" state,
+ *   contact the "notification" notifier.
+ *
+ * A notifier is an application that knows how to consume a D-Bus message from killjoy. The clear
+ * separation between killjoy and the notifiers means that anyone may write a notifier at any time,
+ * in whichever language they wish, to do whatever they want, and with no coordination from the
+ * killjoy development team. Two notifiers are developed in conjunction with killjoy, and they are
+ * small enough to be easily studied:
+ *
+ * * [killjoy Notifier: Logfile]
+ * * [killjoy Notifier: Notification]
+ *
+ * For further conceptual information, see [systemd(1)], especially the section on [concepts].
+ *
+ * Alternatives
  * ------------
  *
- * Most dependencies used by Killjoy are pure Rust libraries and are listed in `Cargo.toml`.
- * However, Killjoy indirectly requires libdbus at runtime. (On Ubuntu, install `libdbus-1-dev`.)
- * For details, see the Rust dbus library's [requirements].
+ * killjoy is inspired by [sagbescheid], [SystemdMon], [pynagsystemd], and [`OnFailure=`], but there
+ * are differences in features, reliability, and efficiency. Of special note:
+ *
+ * * killjoy lets a user write generic rules, like "monitor all `.timer` units." This is in contrast
+ *   to the case where a user must explicitly state every unit to be monitored. Furthermore, units
+ *   may appear or disappear at runtime, e.g. when a package is installed or uninstalled, and
+ *   killjoy correctly handles these events.
+ * * killjoy is cleanly separated from notifiers. Users aren't restricted to the notifiers bundled
+ *   with killjoy.
+ *
+ * Installation
+ * ------------
+ *
+ * Arch Linux users may install using the [killjoy-git] AUR package. A stable package will be
+ * created when killjoy further matures.
+ *
+ * All other users may install killjoy from source. To do so:
+ *
+ * 1.   Ensure systemd, D-Bus, and the rust compiler are installed. On distributions which
+ *      separately package libdbus, install that. (On Ubuntu, this is `libdbus-1-dev`.)
+ * 2.   Get the source code, and compile and install it:
+ *
+ *      ```bash
+ *      git clone https://github.com/Ichimonji10/killjoy.git
+ *      cd killjoy
+ *      scripts/install.sh
+ *      ```
+ *
+ * Configuration
+ * -------------
+ *
+ * Configuration files are searched for as per the [XDG Base Directory Specification]. The first one
+ * found is used. A sample configuration file is as follows:
+ *
+ * ```json
+ * {
+ *     "version": 1,
+ *     "rules": [
+ *         {
+ *             "bus_type": "session",
+ *             "active_states": ["activating", "active", "deactivating", "inactive", "failed"],
+ *             "expression": "foo.service",
+ *             "expression_type": "unit name",
+ *             "notifiers": ["logfile", "notification"]
+ *         }
+ *     ],
+ *     "notifiers": {
+ *         "logfile": {
+ *             "bus_type": "session",
+ *             "bus_name": "name.jerebear.KilljoyNotifierLogfile1"
+ *         },
+ *         "notification": {
+ *             "bus_type": "session",
+ *             "bus_name": "name.jerebear.KilljoyNotifierNotification1"
+ *         }
+ *     }
+ * }
+ * ```
+ *
+ * The contents of the settings file may be validated with `killjoy settings validate`.
+ *
+ * The meaning of the configuration file is as follows:
+ *
+ * *    `version` defines how the rest of the configuration file is interpreted. There is currently
+ *      one configuration file format, and this key should always be set to 1.
+ * *    `rules` is a list of rules stating which units should be monitored. For each rule:
+ *      *   `bus_type` defines which D-Bus buses killjoy shall connect to in search of systemd
+ *          instances. It may be `session` or `system`.
+ *      *   All possible `active_states` are listed above; see [systemd(1)] for details.
+ *      *   `expression_type` and `expression` define which units should be monitored (out of all
+ *          the units killjoy discovers when talking to systemd). If `expression_type` is:
+ *          *   `unit name`, then `expression` should be an exact unit name, like `foo.service`.
+ *          *   `unit type`, then `expression` should be a unit suffix, like `.service`.
+ *          *   `regex`, then `expression` should be a [regex] like `^f[aeiou]{2}\.service$`. Note
+ *              the presence of the line begin and end anchors, `^` and `$`.
+ *      *   `notifiers` is a list of notifier labels.
+ * *    `notifiers` is a map, where keys are notifier labels, and values define how to contact that
+ *      notifier.
+ *      *   `bus_type` defines which message bus killjoy should connect to when sending a message to
+ *          this notifier.
+ *      *   `bus_name` defines the bus name (i.e. address) of the notifier on the message bus.
+ *
+ * Usage
+ * -----
+ *
+ * The typical way to use killjoy is to let it automatically start on login:
+ *
+ * ```bash
+ * systemctl --user enable --now killjoy
+ * ```
+ *
+ * killjoy may also be invoked manually. Execute `killjoy` to run killjoy in the foreground, or
+ * `killjoy --help` to learn about its features.
  *
  * License
  * -------
  *
- * Killjoy is licensed under the GPLv3 or any later version.
+ * killjoy is licensed under the GPLv3 or any later version.
  *
  * [SystemdMon]: https://github.com/joonty/systemd_mon
+ * [XDG Base Directory Specification]: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
  * [`OnFailure=`]: https://www.freedesktop.org/software/systemd/man/systemd.unit.html
  * [concepts]: https://www.freedesktop.org/software/systemd/man/systemd.html#Concepts
+ * [killjoy Notifier: Logfile]: https://github.com/Ichimonji10/killjoy-notifier-logfile
+ * [killjoy Notifier: Notification]: https://github.com/Ichimonji10/killjoy-notifier-notification
+ * [killjoy-git]: https://aur.archlinux.org/packages/killjoy-git/
  * [pynagsystemd]: https://github.com/kbytesys/pynagsystemd
- * [requirements]: https://github.com/diwic/dbus-rs#requirements
+ * [regex]: https://docs.rs/crate/regex/
  * [sagbescheid]: https://sagbescheid.readthedocs.io/en/latest/
  * [systemd(1)]: https://www.freedesktop.org/software/systemd/man/systemd.html
  * [systemd]: https://freedesktop.org/wiki/Software/systemd/
