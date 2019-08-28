@@ -3,8 +3,8 @@
  * Monitor systemd units.
  *
  * killjoy is a systemd unit monitoring application. It discovers systemd units and tracks their
- * states. When a unit changes to a state of interest, killjoy generates notifications via
- * notifiers. Examples of notifiers include:
+ * states. When a unit changes to a state of interest, killjoy contacts notifiers. Examples of
+ * notifiers include:
  *
  * * [killjoy Notifier: Logfile]
  * * [killjoy Notifier: Notification]
