@@ -147,7 +147,7 @@ Usage
 The typical way to use killjoy is to let it automatically start on login:
 
 ```bash
-systemctl --user enable --now killjoy
+systemctl --user enable --now killjoy.service
 ```
 
 killjoy may also be invoked manually. Execute `killjoy` to run killjoy in the foreground, or
