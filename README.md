@@ -46,7 +46,8 @@ small enough to be easily studied:
 
 For further conceptual information, see
 [systemd(1)](https://www.freedesktop.org/software/systemd/man/systemd.html),
-especially the section on [concepts].
+especially the section on
+[concepts](https://www.freedesktop.org/software/systemd/man/systemd.html#Concepts).
 
 Alternatives
 ------------
@@ -126,7 +127,9 @@ The meaning of the configuration file is as follows:
 *    `rules` is a list of rules stating which units should be monitored. For each rule:
      *   `bus_type` defines which D-Bus buses killjoy shall connect to in search of systemd
          instances. It may be `session` or `system`.
-     *   All possible `active_states` are listed above; see [systemd(1)] for details.
+     *   All possible `active_states` are listed above; see
+         [systemd(1)](https://www.freedesktop.org/software/systemd/man/systemd.html)
+         for details.
      *   `expression_type` and `expression` define which units should be monitored (out of all
          the units killjoy discovers when talking to systemd). If `expression_type` is:
          *   `unit name`, then `expression` should be an exact unit name, like `foo.service`.
