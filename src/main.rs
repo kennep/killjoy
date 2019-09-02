@@ -75,12 +75,14 @@
  *
  * 1.   Ensure systemd, D-Bus, and the rust compiler are installed. On distributions which
  *      separately package libdbus, install that. (On Ubuntu, this is `libdbus-1-dev`.)
- * 2.   Get the source code, and compile and install it:
+ * 2.   Install a configuration file. (See the Configuration section, below.)
+ * 3.   Get the source code, and compile and run it:
  *
  *      ```bash
  *      git clone https://github.com/Ichimonji10/killjoy.git
  *      cd killjoy
- *      scripts/install.sh
+ *      cargo build --release
+ *      cargo run
  *      ```
  *
  * Configuration
