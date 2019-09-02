@@ -153,6 +153,21 @@
  * killjoy may also be invoked manually. Execute `killjoy` to run killjoy in the foreground, or
  * `killjoy --help` to learn about its features.
  *
+ * Changelog
+ * ---------
+ *
+ * This section lists the notable changes in each release.
+ *
+ * ### Unreleased
+ *
+ * Nothing yet.
+ *
+ * ### 0.1.0
+ *
+ * Initial release. Anecdotally, killjoy is stable enough to be useful for personal use. One major
+ * breaking change is likely to land in a future release: [issue #13]. This release is being pushed
+ * out anyway so as to make documentation more accessible, and to ease packaging.
+ *
  * License
  * -------
  *
@@ -163,6 +178,7 @@
  * [`OnFailure=`]: https://www.freedesktop.org/software/systemd/man/systemd.unit.html
  * [concepts]: https://www.freedesktop.org/software/systemd/man/systemd.html#Concepts
  * [docs.rs]: https://docs.rs/killjoy
+ * [issue #13]: https://github.com/Ichimonji10/killjoy/issues/13
  * [killjoy Notifier: Logfile]: https://github.com/Ichimonji10/killjoy-notifier-logfile
  * [killjoy Notifier: Notification]: https://github.com/Ichimonji10/killjoy-notifier-notification
  * [killjoy-git]: https://aur.archlinux.org/packages/killjoy-git/
