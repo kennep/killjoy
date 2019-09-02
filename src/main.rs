@@ -1,4 +1,3 @@
-// Keep the following in sync with the readme.
 /*!
  * Monitor systemd units.
  *
@@ -8,6 +7,9 @@
  *
  * * [killjoy Notifier: Logfile]
  * * [killjoy Notifier: Notification]
+ *
+ * Documentation is available on the web at [docs.rs]. It can also be locally generated with `cargo
+ * doc --open`.
  *
  * Concepts
  * --------
@@ -160,6 +162,7 @@
  * [XDG Base Directory Specification]: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
  * [`OnFailure=`]: https://www.freedesktop.org/software/systemd/man/systemd.unit.html
  * [concepts]: https://www.freedesktop.org/software/systemd/man/systemd.html#Concepts
+ * [docs.rs]: https://docs.rs/killjoy
  * [killjoy Notifier: Logfile]: https://github.com/Ichimonji10/killjoy-notifier-logfile
  * [killjoy Notifier: Notification]: https://github.com/Ichimonji10/killjoy-notifier-notification
  * [killjoy-git]: https://aur.archlinux.org/packages/killjoy-git/
