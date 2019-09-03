@@ -208,9 +208,7 @@ impl BusWatcher {
     ) -> Result<HashMap<String, Variant<Box<dyn RefArg + 'static>>>, CrateDBusError> {
         self.get_conn_path(unit_path)
             .get_all("org.freedesktop.systemd1.Unit")
-            .map_err(|err: DBusError| {
-                CrateDBusError::CallOrgFreedesktopDBusPropertiesGetAll(format!("{}", err))
-            })
+            .map_err(CrateDBusError::CallOrgFreedesktopDBusPropertiesGetAll)
     }
 
     // Call `org.freedesktop.systemd1.Manager.GetUnit`.
@@ -219,9 +217,7 @@ impl BusWatcher {
     fn call_manager_get_unit(&self, unit_name: &str) -> Result<Path, CrateDBusError> {
         self.get_conn_path(&wrap_path_for_systemd())
             .get_unit(unit_name)
-            .map_err(|err: DBusError| {
-                CrateDBusError::CallOrgFreedesktopSystemd1ManagerGetUnit(format!("{}", err))
-            })
+            .map_err(CrateDBusError::CallOrgFreedesktopSystemd1ManagerGetUnit)
     }
 
     // Call `org.freedesktop.systemd1.Manager.Subscribe`.
@@ -230,9 +226,7 @@ impl BusWatcher {
     fn call_manager_subscribe(&self) -> Result<(), CrateDBusError> {
         self.get_conn_path(&wrap_path_for_systemd())
             .subscribe()
-            .map_err(|err: DBusError| {
-                CrateDBusError::CallOrgFreedesktopSystemd1ManagerSubscribe(format!("{}", err))
-            })
+            .map_err(CrateDBusError::CallOrgFreedesktopSystemd1ManagerSubscribe)
     }
 
     // Delete the given unit's state from `unit_states`, if present.
@@ -319,9 +313,7 @@ impl BusWatcher {
         self.get_conn_path(&wrap_path_for_systemd())
             .list_units()
             .map(|units| units.into_iter().map(|unit| unit.0).collect())
-            .map_err(|err| {
-                CrateDBusError::CallOrgFreedesktopSystemd1ManagerListUnits(format!("{}", err))
-            })
+            .map_err(CrateDBusError::CallOrgFreedesktopSystemd1ManagerListUnits)
     }
 
     // Handle the UnitNew signal.
@@ -399,7 +391,7 @@ impl BusWatcher {
         let unit_name: String = self
             .get_conn_path(&unit_path)
             .get(INTERFACE_FOR_SYSTEMD_UNIT, "Id")
-            .map_err(|err| CrateDBusError::GetOrgFreedesktopSystemd1UnitId(format!("{}", err)))?
+            .map_err(CrateDBusError::GetOrgFreedesktopSystemd1UnitId)?
             .0
             .as_str()
             .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitId)?
@@ -443,7 +435,7 @@ impl BusWatcher {
         let match_str: String = UnitNew::match_str(Some(&bus_name), Some(&path));
         self.connection
             .add_match(&match_str)
-            .map_err(|err: DBusError| CrateDBusError::AddMatch(match_str, format!("{}", err)))
+            .map_err(|err: DBusError| CrateDBusError::AddMatch(match_str, err))
     }
 
     // Subscribe to the `org.freedesktop.systemd1.Manager.UnitRemoved` signal.
@@ -453,7 +445,7 @@ impl BusWatcher {
         let match_str: String = UnitRemoved::match_str(Some(&bus_name), Some(&path));
         self.connection
             .add_match(&UnitRemoved::match_str(Some(&bus_name), Some(&path)))
-            .map_err(|err: DBusError| CrateDBusError::AddMatch(match_str, format!("{}", err)))
+            .map_err(|err: DBusError| CrateDBusError::AddMatch(match_str, err))
     }
 
     // Subscribe to the `org.freedesktop.DBus.Properties.PropertiesChanged` signal.
@@ -462,7 +454,7 @@ impl BusWatcher {
         let match_str: String = PropertiesChanged::match_str(Some(&bus_name), Some(&unit_path));
         self.connection
             .add_match(&match_str)
-            .map_err(|err: DBusError| CrateDBusError::AddMatch(match_str, format!("{}", err)))
+            .map_err(|err: DBusError| CrateDBusError::AddMatch(match_str, err))
     }
 
     // Unsubscribe from the `org.freedesktop.DBus.Properties.PropertiesChanged` signal.
@@ -472,7 +464,7 @@ impl BusWatcher {
         self.connection
             .remove_match(&match_str)
             .map(|_| ())
-            .map_err(|err: DBusError| CrateDBusError::RemoveMatch(match_str, format!("{}", err)))
+            .map_err(|err: DBusError| CrateDBusError::RemoveMatch(match_str, err))
     }
 }
 

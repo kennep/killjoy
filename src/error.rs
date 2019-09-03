@@ -5,6 +5,7 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::Error as IOError;
 
 use crate::unit::ActiveState;
+use dbus::Error as ExternDBusError;
 
 use regex::Error as RegexError;
 use serde_json::error::Error as SerdeJsonError;
@@ -93,39 +94,39 @@ impl Error for ParseAsActiveStateError {}
 // Like dbus::Error, but with more granular semantics, and implements Send.
 #[derive(Debug)]
 pub enum DBusError {
-    AddMatch(String, String),
-    CallOrgFreedesktopDBusPropertiesGetAll(String),
-    CallOrgFreedesktopSystemd1ManagerGetUnit(String),
-    CallOrgFreedesktopSystemd1ManagerListUnits(String),
-    CallOrgFreedesktopSystemd1ManagerSubscribe(String),
+    AddMatch(String, ExternDBusError),
+    CallOrgFreedesktopDBusPropertiesGetAll(ExternDBusError),
+    CallOrgFreedesktopSystemd1ManagerGetUnit(ExternDBusError),
+    CallOrgFreedesktopSystemd1ManagerListUnits(ExternDBusError),
+    CallOrgFreedesktopSystemd1ManagerSubscribe(ExternDBusError),
     CastOrgFreedesktopSystemd1UnitTimestamp(&'static str),
     CastOrgFreedesktopSystemd1UnitActiveState,
     CastOrgFreedesktopSystemd1UnitId,
     DecodeOrgFreedesktopSystemd1UnitActiveState(ParseAsActiveStateError),
-    GetOrgFreedesktopSystemd1UnitId(String),
+    GetOrgFreedesktopSystemd1UnitId(ExternDBusError),
     MessageLacksPath,
     PropertiesLacksActiveState,
     PropertiesLacksTimestamp(ActiveState, &'static str),
-    RemoveMatch(String, String),
+    RemoveMatch(String, ExternDBusError),
 }
 
 impl Display for DBusError {
     fn fmt(&self, f: &mut Formatter) -> FmtResult {
         match self {
-            DBusError::AddMatch(match_str, cause) => {
-                write!(f, "Failed to add match string '{}': {}", match_str, cause)
+            DBusError::AddMatch(match_str, source) => {
+                write!(f, "Failed to add match string '{}': {}", match_str, source)
             }
-            DBusError::CallOrgFreedesktopDBusPropertiesGetAll(cause) => {
-                write!(f, "Failed to call org.freedesktop.DBus.Properties.GetAll: {}", cause)
+            DBusError::CallOrgFreedesktopDBusPropertiesGetAll(source) => {
+                write!(f, "Failed to call org.freedesktop.DBus.Properties.GetAll: {}", source)
             }
-            DBusError::CallOrgFreedesktopSystemd1ManagerGetUnit(cause) => {
-                write!(f, "Failed to call org.freedesktop.systemd1.Manager.GetUnit: {}", cause)
+            DBusError::CallOrgFreedesktopSystemd1ManagerGetUnit(source) => {
+                write!(f, "Failed to call org.freedesktop.systemd1.Manager.GetUnit: {}", source)
             }
-            DBusError::CallOrgFreedesktopSystemd1ManagerListUnits(cause) => {
-                write!(f, "Failed to call org.freedesktop.systemd1.Manager.ListUnits: {}", cause)
+            DBusError::CallOrgFreedesktopSystemd1ManagerListUnits(source) => {
+                write!(f, "Failed to call org.freedesktop.systemd1.Manager.ListUnits: {}", source)
             }
-            DBusError::CallOrgFreedesktopSystemd1ManagerSubscribe(cause) => {
-                write!(f, "Failed to call org.freedesktop.systemd1.Manager.Subscribe: {}", cause)
+            DBusError::CallOrgFreedesktopSystemd1ManagerSubscribe(source) => {
+                write!(f, "Failed to call org.freedesktop.systemd1.Manager.Subscribe: {}", source)
             }
             DBusError::CastOrgFreedesktopSystemd1UnitTimestamp(timestamp_key) => {
                 write!(f, "Failed to cast org.freedesktop.systemd1.Unit.{} to a u64.", timestamp_key)
@@ -136,11 +137,11 @@ impl Display for DBusError {
             DBusError::CastOrgFreedesktopSystemd1UnitId => {
                 write!(f, "Failed to cast org.freedesktop.systemd1.Unit.Id to a string.")
             }
-            DBusError::DecodeOrgFreedesktopSystemd1UnitActiveState(cause) => {
-                write!(f, "Failed to decode org.freedesktop.systemd1.Unit.ActiveState: {}", cause)
+            DBusError::DecodeOrgFreedesktopSystemd1UnitActiveState(source) => {
+                write!(f, "Failed to decode org.freedesktop.systemd1.Unit.ActiveState: {}", source)
             }
-            DBusError::GetOrgFreedesktopSystemd1UnitId(cause) => {
-                write!(f, "Failed to get org.freedesktop.systemd1.Unit.Id for: {}", cause)
+            DBusError::GetOrgFreedesktopSystemd1UnitId(source) => {
+                write!(f, "Failed to get org.freedesktop.systemd1.Unit.Id for: {}", source)
             }
             DBusError::MessageLacksPath => {
                 write!(f, "Failed to get path from message headers.")
@@ -153,11 +154,24 @@ impl Display for DBusError {
                 "A unit has entered the {:?} state, but that unit's properties lack a timestamp named '{}'.",
                 active_state, timestamp_key
             ),
-            DBusError::RemoveMatch(match_str, cause) => {
-                write!(f, "Failed to remove match string '{}': {}", match_str, cause)
+            DBusError::RemoveMatch(match_str, source) => {
+                write!(f, "Failed to remove match string '{}': {}", match_str, source)
             }
         }
     }
 }
 
-impl Error for DBusError {}
+impl Error for DBusError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            DBusError::AddMatch(_, source) => Some(source),
+            DBusError::CallOrgFreedesktopDBusPropertiesGetAll(source) => Some(source),
+            DBusError::CallOrgFreedesktopSystemd1ManagerGetUnit(source) => Some(source),
+            DBusError::CallOrgFreedesktopSystemd1ManagerListUnits(source) => Some(source),
+            DBusError::CallOrgFreedesktopSystemd1ManagerSubscribe(source) => Some(source),
+            DBusError::GetOrgFreedesktopSystemd1UnitId(source) => Some(source),
+            DBusError::RemoveMatch(_, source) => Some(source),
+            _ => None,
+        }
+    }
+}
