@@ -91,8 +91,6 @@ impl Display for ParseAsActiveStateError {
 impl Error for ParseAsActiveStateError {}
 
 // Like dbus::Error, but with more granular semantics, and implements Send.
-//
-// TODO: Try carrying underlying dbus::Error as property.
 #[derive(Debug)]
 pub enum DBusError {
     AddMatch(String, String),
