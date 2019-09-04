@@ -182,6 +182,11 @@ This section lists the notable changes in each release.
 
 Nothing yet.
 
+### 0.1.1
+
+Fix a documentation error. See
+[#20](https://github.com/Ichimonji10/killjoy/issues/20).
+
 ### 0.1.0
 
 Initial release. Anecdotally, killjoy is stable enough to be useful for personal
