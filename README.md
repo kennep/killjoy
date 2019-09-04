@@ -89,19 +89,20 @@ Arch Linux users may install using the
 [killjoy-git](https://aur.archlinux.org/packages/killjoy-git/) AUR package. A
 stable package will be created when killjoy further matures.
 
-Rust developers may install killjoy with cargo. Note that libdbus must be
-installed. (On Ubuntu, this is provided by the `libdbus-1-dev` package.)
-
-```bash
-cargo install killjoy
-```
+Rust developers may install this app with `cargo install killjoy`. Note that
+libdbus must be installed. (On Ubuntu, this is provided by the `libdbus-1-dev`
+package.)
 
 Configuration
 -------------
 
-Configuration files are searched for as per the [XDG Base Directory
-Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html).
-The first one found is used. A sample configuration file is as follows:
+killjoy searches for a configuration file at `killjoy/settings.json` as per the
+[XDG Base Directory
+Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html),
+and the first one found is used. In practice, this means that the configuration
+file should typically be installed at `~/.config/killjoy/settings.json`.
+
+A sample configuration file is as follows:
 
 ```json
 {
@@ -180,7 +181,7 @@ This section lists the notable changes in each release.
 
 ### Unreleased
 
-Nothing yet.
+Improve installation instructions.
 
 ### 0.1.1
 
