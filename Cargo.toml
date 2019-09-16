@@ -17,9 +17,13 @@ clap   =  "^2.33.0"
 dbus   =  "^0.6.5"
 regex  =  "^1.2.0"
 serde = { version = "^1.0.98", features = ["derive"] }
-serde_json  =  "^1.0.40"
-textwrap    =  "^0.11.0"
-xdg         =  "^2.2.0"
+serde_json     =  "^1.0.40"
+slog           =  "^2.5.2"
+slog-async     =  "^2.3.0"
+slog-journald  =  "^2.1.1"
+slog-term      =  "^2.4.1"
+textwrap       =  "^0.11.0"
+xdg            =  "^2.2.0"
 
 [dev-dependencies]
 assert_cmd  =  "^0.11.0"

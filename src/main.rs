@@ -16,6 +16,10 @@ use std::thread;
 use std::thread::JoinHandle;
 
 use clap::ArgMatches;
+use slog::{debug, error, info, o, Drain, Duplicate, Logger};
+use slog_async::Async;
+use slog_journald::JournaldDrain;
+use slog_term::{FullFormat, TermDecorator};
 
 use crate::bus::BusWatcher;
 use crate::error::{SettingsFileError, TopLevelError};
@@ -34,6 +38,29 @@ fn main() {
 // Fetch and handle CLI arguments. On error may be returned per thread.
 fn handle_args() -> Result<(), Vec<TopLevelError>> {
     let args = cli::get_cli_args();
+
+    // process::exit() skips destructors. This scope exists to ensure the logger flushes before
+    // process::exit() executes.
+    //
+    // This modules has calls to process::exit() spread throughout. This is problematic, as it means
+    // that there are numerous locations where `logger` might need to be flushed. A reasonable
+    // solution could be to let error conditions propagate to this function, and to let this
+    // function handle the task of flushing the logger, deciding on an exit code, and calling
+    // process::exit().
+    {
+        let journald_drain = Async::default(JournaldDrain.ignore_res());
+        let term_drain = Async::default(
+            FullFormat::new(TermDecorator::new().build())
+                .build()
+                .ignore_res(),
+        );
+        let root_drain = Duplicate::new(journald_drain, term_drain).ignore_res();
+        let logger = Logger::root(root_drain, o!());
+        error!(logger, "error message");
+        info!(logger, "info message");
+        debug!(logger, "debug message");
+    }
+
     match args.subcommand() {
         ("settings", Some(sub_args)) => {
             handle_settings_subcommand(&sub_args).map_err(|err| vec![err])?
