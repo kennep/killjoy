@@ -49,8 +49,7 @@ fn test_settings_load_path_success() {
 // Call `killjoy settings validate` and expect failure due to the settings file being invalid.
 #[test]
 fn test_settings_validate_failure_v1() {
-    let (config_dir, _, mut settings_file) = create_skeleton_config();
-    write_invalid_settings(&mut settings_file);
+    let (config_dir, _, _) = create_skeleton_config();
     let config_dir_str = path_to_str(&config_dir.path());
     Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
@@ -117,7 +116,8 @@ fn test_settings_validate_failure_v3() {
 // Call `killjoy settings validate` and expect success.
 #[test]
 fn test_settings_validate_success() {
-    let (config_dir, _, _) = create_skeleton_config();
+    let (config_dir, _, mut settings_file) = create_skeleton_config();
+    write_session_settings(&mut settings_file);
     let config_dir_str = path_to_str(&config_dir.path());
     Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
@@ -133,8 +133,7 @@ fn test_settings_validate_success() {
 // Call `killjoy settings validate $path` and expect failure.
 #[test]
 fn test_settings_validate_path_failure() {
-    let mut settings_file = NamedTempFile::new().expect("Failed to create a named temporary file.");
-    write_invalid_settings(&mut settings_file);
+    let settings_file = NamedTempFile::new().expect("Failed to create a named temporary file.");
 
     Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
@@ -149,7 +148,7 @@ fn test_settings_validate_path_failure() {
 #[test]
 fn test_settings_validate_path_success() {
     let mut settings_file = NamedTempFile::new().expect("Failed to create a named temporary file.");
-    write_valid_settings(&mut settings_file);
+    write_session_settings(&mut settings_file);
     Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
         .args(&["settings", "validate", path_to_str(&settings_file.path())])
@@ -165,7 +164,8 @@ fn test_settings_validate_path_success() {
 // killjoy is the only peer.
 #[test]
 fn test_no_systemd() {
-    let (config_dir, _, _) = create_skeleton_config();
+    let (config_dir, _, mut settings_file) = create_skeleton_config();
+    write_session_settings(&mut settings_file);
 
     // Exit code is 101 for panic.
     let config_dir_str = path_to_str(&config_dir.path());
@@ -182,8 +182,7 @@ fn test_no_systemd() {
 // Call `killjoy`, and let the settings be invalid.
 #[test]
 fn test_run_settings_failure() {
-    let (config_dir, _, mut settings_file) = create_skeleton_config();
-    write_invalid_settings(&mut settings_file);
+    let (config_dir, _, _) = create_skeleton_config();
     let config_dir_str = path_to_str(&config_dir.path());
     Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
@@ -199,7 +198,8 @@ fn test_run_settings_failure() {
 // Call `killjoy`, and let the settings be valid.
 #[test]
 fn test_run_settings_success() {
-    let (config_dir, _, _) = create_skeleton_config();
+    let (config_dir, _, mut settings_file) = create_skeleton_config();
+    write_system_settings(&mut settings_file);
     let config_dir_str = path_to_str(&config_dir.path());
     Command::cargo_bin("killjoy")
         .expect("Failed to find crate-local executable.")
@@ -222,29 +222,22 @@ fn path_to_str(path: &Path) -> &str {
 
 // Create a temporary directory containing "killjoy/settings.json".
 //
-// The settings file is populated with a valid configuration. The returned tuple is of the form
-// `(temp_dir, settings_dir, settings_file)`.
+// The settings file isempty. The returned tuple is of the form `(temp_dir, settings_dir,
+// settings_file)`.
 fn create_skeleton_config() -> (TempDir, PathBuf, File) {
     let xdg_config_home = TempDir::new().expect("Failed to create xdg_config_home.");
 
     let settings_dir = xdg_config_home.path().join(Path::new("killjoy"));
     fs::create_dir(&settings_dir).expect("Failed to create settings_dir.");
 
-    let mut settings_file = File::create(settings_dir.join(Path::new("settings.json")))
+    let settings_file = File::create(settings_dir.join(Path::new("settings.json")))
         .expect("Failed to create settings_file.");
-    write_valid_settings(&mut settings_file);
 
     (xdg_config_home, PathBuf::from(settings_dir), settings_file)
 }
 
-fn write_invalid_settings<T: Write>(handle: &mut T) {
-    let settings_str = "{}";
-    handle
-        .write_all(settings_str.as_bytes())
-        .expect("Failed to populate settings file.");
-}
-
-fn write_valid_settings<T: Write>(handle: &mut T) {
+// Write a valid settings file, where the monitoring rule references the session bus.
+fn write_session_settings<T: Write>(handle: &mut T) {
     let settings_str = r###"
     {
         "version": 1,
@@ -252,6 +245,33 @@ fn write_valid_settings<T: Write>(handle: &mut T) {
             {
                 "active_states": ["failed"],
                 "bus_type": "session",
+                "expression": "syncthing.service",
+                "expression_type": "unit name",
+                "notifiers": ["desktop popup"]
+            }
+        ],
+        "notifiers": {
+            "desktop popup": {
+                "bus_type": "session",
+                "bus_name": "name.jerebear.KilljoyNotifierNotification1"
+            }
+        }
+    }
+    "###;
+    handle
+        .write_all(settings_str.as_bytes())
+        .expect("Failed to populate settings file.");
+}
+
+// Write a valid settings file, where the monitoring rule references the system bus.
+fn write_system_settings<T: Write>(handle: &mut T) {
+    let settings_str = r###"
+    {
+        "version": 1,
+        "rules": [
+            {
+                "active_states": ["failed"],
+                "bus_type": "system",
                 "expression": "syncthing.service",
                 "expression_type": "unit name",
                 "notifiers": ["desktop popup"]

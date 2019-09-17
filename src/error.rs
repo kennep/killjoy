@@ -3,12 +3,73 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::Error as IOError;
+use std::num::ParseIntError;
 
 use crate::unit::ActiveState;
 use dbus::Error as ExternDBusError;
 
 use regex::Error as RegexError;
 use serde_json::error::Error as SerdeJsonError;
+
+// An error in src/main.rs.
+//
+// Errors that bubble up to src/main.rs are top level errors.
+#[derive(Debug)]
+pub enum TopLevelError {
+    // A wrapper.
+    DBusError(DBusError),
+
+    // The --loop-timeout argument is absent.
+    GetLoopTimeoutArg,
+
+    // If one calls std::thead::ThreadHandle::join and the referenced thread panics, the value
+    // passed to panic! is returned in a Box. This variant references that value.
+    MonitoringThreadPanicked(Box<dyn std::any::Any + std::marker::Send>),
+
+    // The --loop-timeout argument is unparseable, i.e. some_str.parse::<u32>() failed.
+    ParseLoopTimeoutArg(ParseIntError),
+
+    // A wrapper.
+    SettingsFileError(SettingsFileError),
+
+    // This *should* always be Some(subcmd), but clap doesn't guarantee it.
+    UnexpectedSubcommand(Option<String>),
+}
+
+impl Display for TopLevelError {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        match self {
+            TopLevelError::DBusError(err) => write!(f, "{}", err),
+            TopLevelError::GetLoopTimeoutArg => {
+                write!(f, "Failed to get --loop-timeout argument. A default should've been set in the argument parser.")
+            }
+            TopLevelError::MonitoringThreadPanicked(err) => {
+                write!(f, "A monitoring thread panicked. Source: {:?}", err)
+            }
+            TopLevelError::ParseLoopTimeoutArg(err) => {
+                write!(f, "Failed to parse --loop-timeout argument: {:?}", err)
+            }
+            TopLevelError::SettingsFileError(err) => write!(f, "{}", err),
+            TopLevelError::UnexpectedSubcommand(subcmd_opt) => match subcmd_opt {
+                Some(subcmd) => write!(f, "An unexpected subcommand was encountered: {}", subcmd),
+                None => write!(f, "An unexpected subcommand was encountered."),
+            },
+        }
+    }
+}
+
+impl Error for TopLevelError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            TopLevelError::DBusError(err) => Some(err),
+            TopLevelError::GetLoopTimeoutArg => None,
+            TopLevelError::MonitoringThreadPanicked(_) => None,
+            TopLevelError::ParseLoopTimeoutArg(err) => Some(err),
+            TopLevelError::SettingsFileError(err) => Some(err),
+            TopLevelError::UnexpectedSubcommand(_) => None,
+        }
+    }
+}
 
 // An error used when working with a settings file.
 #[derive(Debug)]
