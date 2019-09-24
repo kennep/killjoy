@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use assert_cmd::cargo;
-use assert_cmd::prelude::{CommandCargoExt, OutputAssertExt};
+use assert_cmd::prelude::OutputAssertExt;
 use tempfile::{NamedTempFile, TempDir};
 
 // Call `killjoy settings load-path` and expect failure.
@@ -22,11 +22,10 @@ fn test_settings_load_path_failure() {
         .path()
         .to_str()
         .expect("Failed to convert path to string.");
-    Command::cargo_bin("killjoy")
-        .expect("Failed to find crate-local executable.")
+    Command::new("dbus-run-session")
         .env("XDG_CONFIG_HOME", config_dir_str)
         .env("XDG_CONFIG_DIRS", config_dir_str)
-        .args(&["settings", "load-path"])
+        .args(&["--", &killjoy_path_as_string()[..], "settings", "load-path"])
         .output()
         .expect("Failed to run killjoy.")
         .assert()
@@ -41,11 +40,10 @@ fn test_settings_load_path_success() {
         .path()
         .to_str()
         .expect("Failed to convert path to string.");
-    Command::cargo_bin("killjoy")
-        .expect("Failed to find crate-local executable.")
+    Command::new("dbus-run-session")
         .env("XDG_CONFIG_HOME", config_dir_str)
         .env("XDG_CONFIG_DIRS", config_dir_str)
-        .args(&["settings", "load-path"])
+        .args(&["--", &killjoy_path_as_string()[..], "settings", "load-path"])
         .output()
         .expect("Failed to run killjoy.")
         .assert()
@@ -60,11 +58,10 @@ fn test_settings_validate_failure_v1() {
         .path()
         .to_str()
         .expect("Failed to convert path to string.");
-    Command::cargo_bin("killjoy")
-        .expect("Failed to find crate-local executable.")
+    Command::new("dbus-run-session")
         .env("XDG_CONFIG_HOME", config_dir_str)
         .env("XDG_CONFIG_DIRS", config_dir_str)
-        .args(&["settings", "validate"])
+        .args(&["--", &killjoy_path_as_string()[..], "settings", "validate"])
         .output()
         .expect("Failed to run killjoy.")
         .assert()
@@ -83,11 +80,10 @@ fn test_settings_validate_failure_v2() {
         .path()
         .to_str()
         .expect("Failed to convert path to string.");
-    Command::cargo_bin("killjoy")
-        .expect("Failed to find crate-local executable.")
+    Command::new("dbus-run-session")
         .env("XDG_CONFIG_HOME", config_dir_str)
         .env("XDG_CONFIG_DIRS", config_dir_str)
-        .args(&["settings", "validate"])
+        .args(&["--", &killjoy_path_as_string()[..], "settings", "validate"])
         .output()
         .expect("Failed to run killjoy.")
         .assert()
@@ -117,11 +113,10 @@ fn test_settings_validate_failure_v3() {
         .expect("Failed to run chmod.")
         .assert()
         .code(0);
-    Command::cargo_bin("killjoy")
-        .expect("Failed to find crate-local executable.")
+    Command::new("dbus-run-session")
         .env("XDG_CONFIG_HOME", config_dir_str)
         .env("XDG_CONFIG_DIRS", config_dir_str)
-        .args(&["settings", "validate"])
+        .args(&["--", &killjoy_path_as_string()[..], "settings", "validate"])
         .output()
         .expect("Failed to run killjoy.")
         .assert()
@@ -137,11 +132,10 @@ fn test_settings_validate_success() {
         .path()
         .to_str()
         .expect("Failed to convert path to string.");
-    Command::cargo_bin("killjoy")
-        .expect("Failed to find crate-local executable.")
+    Command::new("dbus-run-session")
         .env("XDG_CONFIG_HOME", config_dir_str)
         .env("XDG_CONFIG_DIRS", config_dir_str)
-        .args(&["settings", "validate"])
+        .args(&["--", &killjoy_path_as_string()[..], "settings", "validate"])
         .output()
         .expect("Failed to run killjoy.")
         .assert()
@@ -153,9 +147,10 @@ fn test_settings_validate_success() {
 fn test_settings_validate_path_failure() {
     let settings_file = NamedTempFile::new().expect("Failed to create a named temporary file.");
 
-    Command::cargo_bin("killjoy")
-        .expect("Failed to find crate-local executable.")
+    Command::new("dbus-run-session")
         .args(&[
+            "--",
+            &killjoy_path_as_string()[..],
             "settings",
             "validate",
             settings_file
@@ -174,9 +169,10 @@ fn test_settings_validate_path_failure() {
 fn test_settings_validate_path_success() {
     let mut settings_file = NamedTempFile::new().expect("Failed to create a named temporary file.");
     write_session_settings(&mut settings_file);
-    Command::cargo_bin("killjoy")
-        .expect("Failed to find crate-local executable.")
+    Command::new("dbus-run-session")
         .args(&[
+            "--",
+            &killjoy_path_as_string()[..],
             "settings",
             "validate",
             settings_file
@@ -198,8 +194,6 @@ fn test_settings_validate_path_success() {
 fn test_no_systemd() {
     let (config_dir, _, mut settings_file) = create_skeleton_config();
     write_session_settings(&mut settings_file);
-
-    // Exit code is 101 for panic.
     let config_dir_str = config_dir
         .path()
         .to_str()
@@ -207,13 +201,7 @@ fn test_no_systemd() {
     Command::new("dbus-run-session")
         .env("XDG_CONFIG_HOME", config_dir_str)
         .env("XDG_CONFIG_DIRS", config_dir_str)
-        .args(&[
-            "--",
-            cargo::cargo_bin("killjoy")
-                .as_path()
-                .to_str()
-                .expect("Failed to convert path to string."),
-        ])
+        .args(&["--", &killjoy_path_as_string()[..]])
         .output()
         .expect("failed to run executable")
         .assert()
@@ -228,11 +216,16 @@ fn test_run_settings_failure() {
         .path()
         .to_str()
         .expect("Failed to convert path to string.");
-    Command::cargo_bin("killjoy")
-        .expect("Failed to find crate-local executable.")
+    Command::new("dbus-run-session")
         .env("XDG_CONFIG_HOME", config_dir_str)
         .env("XDG_CONFIG_DIRS", config_dir_str)
-        .args(&["--loop-once", "--loop-timeout", "0"])
+        .args(&[
+            "--",
+            &killjoy_path_as_string()[..],
+            "--loop-once",
+            "--loop-timeout",
+            "0",
+        ])
         .output()
         .expect("Failed to run killjoy")
         .assert()
@@ -248,11 +241,16 @@ fn test_run_settings_success() {
         .path()
         .to_str()
         .expect("Failed to convert path to string.");
-    Command::cargo_bin("killjoy")
-        .expect("Failed to find crate-local executable.")
+    Command::new("dbus-run-session")
         .env("XDG_CONFIG_HOME", config_dir_str)
         .env("XDG_CONFIG_DIRS", config_dir_str)
-        .args(&["--loop-once", "--loop-timeout", "0"])
+        .args(&[
+            "--",
+            &killjoy_path_as_string()[..],
+            "--loop-once",
+            "--loop-timeout",
+            "0",
+        ])
         .output()
         .expect("Failed to run killjoy")
         .assert()
@@ -275,7 +273,18 @@ fn create_skeleton_config() -> (TempDir, PathBuf, File) {
     (xdg_config_home, PathBuf::from(settings_dir), settings_file)
 }
 
+// Get the path to killjoy, as a string.
+fn killjoy_path_as_string() -> String {
+    cargo::cargo_bin("killjoy")
+        .as_path()
+        .to_str()
+        .expect("Failed to convert path to string.")
+        .to_string()
+}
+
 // Write a valid settings file, where the monitoring rule references the session bus.
+//
+// The unit name is a random uuid4 generated by `python3 -c 'import uuid; print(uuid.uuid4())'`.
 fn write_session_settings<T: Write>(handle: &mut T) {
     let settings_str = r###"
     {
@@ -284,7 +293,7 @@ fn write_session_settings<T: Write>(handle: &mut T) {
             {
                 "active_states": ["failed"],
                 "bus_type": "session",
-                "expression": "syncthing.service",
+                "expression": "e28247a6-7d4f-484a-a124-7bdee20a4a64.service",
                 "expression_type": "unit name",
                 "notifiers": ["desktop popup"]
             }
@@ -303,6 +312,8 @@ fn write_session_settings<T: Write>(handle: &mut T) {
 }
 
 // Write a valid settings file, where the monitoring rule references the system bus.
+//
+// The unit name is a random uuid4 generated by `python3 -c 'import uuid; print(uuid.uuid4())'`.
 fn write_system_settings<T: Write>(handle: &mut T) {
     let settings_str = r###"
     {
@@ -311,7 +322,7 @@ fn write_system_settings<T: Write>(handle: &mut T) {
             {
                 "active_states": ["failed"],
                 "bus_type": "system",
-                "expression": "syncthing.service",
+                "expression": "7190f41c-48c0-48fb-8238-d6a411b42a64.service",
                 "expression_type": "unit name",
                 "notifiers": ["desktop popup"]
             }
