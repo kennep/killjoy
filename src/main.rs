@@ -86,7 +86,7 @@ fn handle_no_subcommand(loop_once: bool, loop_timeout: u32) -> Result<(), Vec<To
         .map(|bus_type| {
             let settings_clone = settings.clone();
             thread::spawn(move || {
-                BusWatcher::new(bus_type, settings_clone, loop_once, loop_timeout).run()
+                BusWatcher::new(bus_type, settings_clone, loop_once, loop_timeout)?.run()
             })
         })
         .collect();

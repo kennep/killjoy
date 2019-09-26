@@ -163,6 +163,7 @@ pub enum DBusError {
     CastOrgFreedesktopSystemd1UnitTimestamp(&'static str),
     CastOrgFreedesktopSystemd1UnitActiveState,
     CastOrgFreedesktopSystemd1UnitId,
+    ConnectToBus(ExternDBusError),
     DecodeOrgFreedesktopSystemd1UnitActiveState(ParseAsActiveStateError),
     GetOrgFreedesktopSystemd1UnitId(ExternDBusError),
     MessageLacksPath,
@@ -198,6 +199,9 @@ impl Display for DBusError {
             DBusError::CastOrgFreedesktopSystemd1UnitId => {
                 write!(f, "Failed to cast org.freedesktop.systemd1.Unit.Id to a string.")
             }
+            DBusError::ConnectToBus(source) => {
+                write!(f, "Failed to connect to D-Bus bus. Cause: {}", source)
+            }
             DBusError::DecodeOrgFreedesktopSystemd1UnitActiveState(source) => {
                 write!(f, "Failed to decode org.freedesktop.systemd1.Unit.ActiveState: {}", source)
             }
@@ -230,6 +234,7 @@ impl Error for DBusError {
             DBusError::CallOrgFreedesktopSystemd1ManagerGetUnit(source) => Some(source),
             DBusError::CallOrgFreedesktopSystemd1ManagerListUnits(source) => Some(source),
             DBusError::CallOrgFreedesktopSystemd1ManagerSubscribe(source) => Some(source),
+            DBusError::ConnectToBus(source) => Some(source),
             DBusError::GetOrgFreedesktopSystemd1UnitId(source) => Some(source),
             DBusError::RemoveMatch(_, source) => Some(source),
             _ => None,

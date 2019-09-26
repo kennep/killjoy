@@ -40,17 +40,21 @@ impl BusWatcher {
     // Initialize a new monitor, but do not start watching units.
     //
     // To watch for units of interest, and to take action when those units of interest transition to
-    // states of interest, call `run`.
-    pub fn new(bus_type: BusType, settings: Settings, loop_once: bool, loop_timeout: u32) -> Self {
-        let connection = Connection::get_private(bus_type)
-            .expect(&format!("Failed to connect to {:?} D-Bus bus.", bus_type)[..]);
+    // states of interest, call `run`. Return an error if unable to connect to the given `bus_type`.
+    pub fn new(
+        bus_type: BusType,
+        settings: Settings,
+        loop_once: bool,
+        loop_timeout: u32,
+    ) -> Result<Self, CrateDBusError> {
+        let connection = Connection::get_private(bus_type).map_err(CrateDBusError::ConnectToBus)?;
         let settings = settings;
-        BusWatcher {
+        Ok(BusWatcher {
             loop_once,
             loop_timeout,
             connection,
             settings,
-        }
+        })
     }
 
     // Track units of interest.
