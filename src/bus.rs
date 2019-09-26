@@ -174,8 +174,7 @@ impl BusWatcher {
                         Ok(unit_props) => unit_props,
                         Err(_) => continue,
                     };
-                    self.upsert_unit_states(&unit_name, &unit_props, &mut unit_states)
-                        .expect("Failed to upsert '{}' into map of unit state machines.");
+                    self.upsert_unit_states(&unit_name, &unit_props, &mut unit_states)?;
                 }
             }
         }
@@ -338,8 +337,7 @@ impl BusWatcher {
                 Ok(unit_props) => unit_props,
                 Err(_) => return Ok(()),
             };
-            self.upsert_unit_states(unit_name, &unit_props, unit_states)
-                .expect("Failed to upsert '{}' into map of unit state machines.");
+            self.upsert_unit_states(unit_name, &unit_props, unit_states)?;
         }
         Ok(())
     }
