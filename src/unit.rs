@@ -3,7 +3,7 @@
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
-use crate::error::ParseAsActiveStateError;
+use crate::error::{DBusError, ParseAsActiveStateError};
 use crate::timestamp::MonotonicTimestamp;
 
 // The possible values for a unit's `ActiveState` attribute.
@@ -78,16 +78,20 @@ pub struct UnitStateMachine {
 
 impl UnitStateMachine {
     // Initialize the state machine's attributes and call `on_change()`.
-    pub fn new<T>(active_state: ActiveState, mono_ts: MonotonicTimestamp, on_change: &T) -> Self
+    pub fn new<T>(
+        active_state: ActiveState,
+        mono_ts: MonotonicTimestamp,
+        on_change: &T,
+    ) -> Result<Self, DBusError>
     where
-        T: Fn(&UnitStateMachine, Option<ActiveState>),
+        T: Fn(&UnitStateMachine, Option<ActiveState>) -> Result<(), DBusError>,
     {
         let usm = UnitStateMachine {
             active_state,
             mono_ts,
         };
-        on_change(&usm, None);
-        usm
+        on_change(&usm, None)?;
+        Ok(usm)
     }
 
     // Optionally update the state machine's attributes and call `on_change()`.
@@ -99,17 +103,19 @@ impl UnitStateMachine {
         active_state: ActiveState,
         mono_ts: MonotonicTimestamp,
         on_change: &T,
-    ) where
-        T: Fn(&UnitStateMachine, Option<ActiveState>),
+    ) -> Result<(), DBusError>
+    where
+        T: Fn(&UnitStateMachine, Option<ActiveState>) -> Result<(), DBusError>,
     {
         if self.mono_ts.0 < mono_ts.0 {
             self.mono_ts = mono_ts;
             if self.active_state != active_state {
                 let old_state = self.active_state;
                 self.active_state = active_state;
-                on_change(&self, Some(old_state));
+                on_change(&self, Some(old_state))?;
             }
         }
+        Ok(())
     }
 
     pub fn active_state(&self) -> ActiveState {
@@ -121,13 +127,16 @@ impl UnitStateMachine {
 mod tests {
     use super::*;
 
-    fn null_on_change(_: &UnitStateMachine, _: Option<ActiveState>) {}
+    fn null_on_change(_: &UnitStateMachine, _: Option<ActiveState>) -> Result<(), DBusError> {
+        Ok(())
+    }
 
     // Pass a unit state and a timestamp.
     #[test]
     fn test_usm_new() {
         let usm =
-            UnitStateMachine::new(ActiveState::Failed, MonotonicTimestamp(10), &null_on_change);
+            UnitStateMachine::new(ActiveState::Failed, MonotonicTimestamp(10), &null_on_change)
+                .expect("Failed to create UnitStateMachine.");
         assert_eq!(usm.active_state, ActiveState::Failed);
         assert_eq!(usm.mono_ts.0, 10);
     }
@@ -139,17 +148,20 @@ mod tests {
             ActiveState::Inactive,
             MonotonicTimestamp(25),
             &null_on_change,
-        );
+        )
+        .expect("Failed to create UnitStateMachine.");
 
         usm.update(
             ActiveState::Activating,
             MonotonicTimestamp(24),
             &null_on_change,
-        );
+        )
+        .expect("Failed to update UnitStateMachine.");
         assert_eq!(usm.active_state, ActiveState::Inactive);
         assert_eq!(usm.mono_ts.0, 25);
 
-        usm.update(ActiveState::Active, MonotonicTimestamp(25), &null_on_change);
+        usm.update(ActiveState::Active, MonotonicTimestamp(25), &null_on_change)
+            .expect("Failed to update UnitStateMachine.");
         assert_eq!(usm.active_state, ActiveState::Inactive);
         assert_eq!(usm.mono_ts.0, 25);
     }
@@ -161,17 +173,20 @@ mod tests {
             ActiveState::Inactive,
             MonotonicTimestamp(25),
             &null_on_change,
-        );
+        )
+        .expect("Failed to create UnitStateMachine.");
 
         usm.update(
             ActiveState::Activating,
             MonotonicTimestamp(26),
             &null_on_change,
-        );
+        )
+        .expect("Failed to update UnitStateMachine.");
         assert_eq!(usm.active_state, ActiveState::Activating);
         assert_eq!(usm.mono_ts.0, 26);
 
-        usm.update(ActiveState::Active, MonotonicTimestamp(27), &null_on_change);
+        usm.update(ActiveState::Active, MonotonicTimestamp(27), &null_on_change)
+            .expect("Failed to update UnitStateMachine.");
         assert_eq!(usm.active_state, ActiveState::Active);
         assert_eq!(usm.mono_ts.0, 27);
     }

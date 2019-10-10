@@ -238,12 +238,17 @@ impl BusWatcher {
     }
 
     // Generate callback for use in case a unit state machine changes.
+    //
+    // The callback updates the given unit state machine to the given state, and contacts a notifier
+    // if any rules match this state change. An error is returned if contacting the notifier fails.
     fn gen_on_change<'a>(
         &'a self,
         unit_name: &'a str,
         real_ts: RealtimeTimestamp,
-    ) -> impl Fn(&UnitStateMachine, Option<ActiveState>) + 'a {
-        move |usm: &UnitStateMachine, old_state: Option<ActiveState>| {
+    ) -> impl Fn(&UnitStateMachine, Option<ActiveState>) -> Result<(), CrateDBusError> + 'a {
+        move |usm: &UnitStateMachine,
+              old_state: Option<ActiveState>|
+              -> Result<(), CrateDBusError> {
             let active_state = usm.active_state();
             let matching_rules: Vec<&Rule> = self.settings.rules.iter().collect();
             let matching_rules = get_rules_matching_name(&matching_rules, &unit_name);
@@ -251,13 +256,16 @@ impl BusWatcher {
 
             for matching_rule in &matching_rules {
                 for notifier_name in &matching_rule.notifiers {
+                    // This potential error can be eliminated by restructuring the settings object.
+                    // See: https://github.com/Ichimonji10/killjoy/issues/3 . In the meantime, the
+                    // error hierarchy could be flattened, and we could raise InvalidNotifier.
                     let notifier =
                         self.settings.notifiers.get(notifier_name).expect(
                             &format!("Failed to get notifier named '{}'", notifier_name)[..],
                         );
 
                     let header_bus_name = notifier.get_bus_name();
-                    let header_path = make_path_like_bus_name(&header_bus_name);
+                    let header_path = make_path_like_bus_name(&header_bus_name)?;
                     let header_interface = wrap_interface_for_killjoy_notifier();
                     let header_member = wrap_member_for_notify();
 
@@ -281,9 +289,8 @@ impl BusWatcher {
                         &body_active_states,
                     );
 
-                    let conn = Connection::get_private(notifier.bus_type).expect(
-                        &format!("Failed to connect to {:?} D-Bus bus.", notifier.bus_type)[..],
-                    );
+                    let conn = Connection::get_private(notifier.bus_type)
+                        .map_err(CrateDBusError::ConnectToBus)?;
                     if let Err(err) = conn.send_with_reply_and_block(msg, 5000) {
                         eprintln!(
                             "Error occurred when contacting notifier \"{}\": {}",
@@ -292,6 +299,7 @@ impl BusWatcher {
                     }
                 }
             }
+            Ok(())
         }
     }
 
@@ -423,10 +431,17 @@ impl BusWatcher {
 
         // Upsert unit state machine.
         let on_change = self.gen_on_change(&unit_name, real_ts);
-        unit_states
-            .entry(unit_name.to_string())
-            .and_modify(|usm| usm.update(active_state, mono_ts.clone(), &on_change))
-            .or_insert_with(|| UnitStateMachine::new(active_state, mono_ts.clone(), &on_change));
+        match unit_states.get_mut(unit_name) {
+            Some(usm) => {
+                usm.update(active_state, mono_ts.clone(), &on_change)?;
+            }
+            None => {
+                unit_states.insert(
+                    unit_name.to_string(),
+                    UnitStateMachine::new(active_state, mono_ts.clone(), &on_change)?,
+                );
+            }
+        }
         Ok(())
     }
 
@@ -506,18 +521,19 @@ fn get_active_state(unit_props: &UnitProps) -> Result<ActiveState, CrateDBusErro
 
 // Given a bus name foo.bar.Biz1, make path /foo/bar/Biz1.
 //
-// Will panic if unable to make a string from the contents of `bus_name`, or if the Path object
-// being created does not contain a valid path name.
-fn make_path_like_bus_name(bus_name: &BusName) -> Path<'static> {
+// Will return an error if unable to make a string from the contents of `bus_name`, or if the Path
+// object being created does not contain a valid path name.
+fn make_path_like_bus_name(bus_name: &BusName) -> Result<Path<'static>, CrateDBusError> {
     let mut path_str = bus_name
         .as_cstr()
         .to_str()
-        .expect("Failed to create string from BusName.")
+        .map_err(CrateDBusError::CastBusNameToStr)?
         .replace(".", "/");
     path_str.insert(0, '/');
-    Path::new(path_str)
-        .expect(&format!("Failed to convert bus name to path. Bus name: {}", bus_name)[..])
-        .to_owned()
+    let path = Path::new(path_str)
+        .map_err(CrateDBusError::CastStrToPath)?
+        .to_owned();
+    Ok(path)
 }
 
 // Tell whether at least one rule matches the given unit name.
@@ -558,7 +574,7 @@ mod tests {
     fn test_make_path_like_bus_name() {
         let bus_name = BusName::new(BUS_NAME_FOR_SYSTEMD)
             .expect(&format!("Failed to create BusName from {}", BUS_NAME_FOR_SYSTEMD)[..]);
-        let path = make_path_like_bus_name(&bus_name);
+        let path = make_path_like_bus_name(&bus_name).expect("Failed to cast bus name to path.");
         let path_str = path
             .as_cstr()
             .to_str()

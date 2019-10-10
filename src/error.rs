@@ -4,6 +4,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::io::Error as IOError;
 use std::num::ParseIntError;
+use std::str::Utf8Error;
 
 use crate::unit::ActiveState;
 use dbus::Error as ExternDBusError;
@@ -160,9 +161,11 @@ pub enum DBusError {
     CallOrgFreedesktopSystemd1ManagerGetUnit(ExternDBusError),
     CallOrgFreedesktopSystemd1ManagerListUnits(ExternDBusError),
     CallOrgFreedesktopSystemd1ManagerSubscribe(ExternDBusError),
-    CastOrgFreedesktopSystemd1UnitTimestamp(&'static str),
+    CastBusNameToStr(Utf8Error),
     CastOrgFreedesktopSystemd1UnitActiveState,
     CastOrgFreedesktopSystemd1UnitId,
+    CastOrgFreedesktopSystemd1UnitTimestamp(&'static str),
+    CastStrToPath(String),
     ConnectToBus(ExternDBusError),
     DecodeOrgFreedesktopSystemd1UnitActiveState(ParseAsActiveStateError),
     GetOrgFreedesktopSystemd1UnitId(ExternDBusError),
@@ -190,6 +193,9 @@ impl Display for DBusError {
             DBusError::CallOrgFreedesktopSystemd1ManagerSubscribe(source) => {
                 write!(f, "Failed to call org.freedesktop.systemd1.Manager.Subscribe: {}", source)
             }
+            DBusError::CastBusNameToStr(source) => {
+                write!(f, "Failed to cast bus name to UTF-8 string: {}", source)
+            }
             DBusError::CastOrgFreedesktopSystemd1UnitTimestamp(timestamp_key) => {
                 write!(f, "Failed to cast org.freedesktop.systemd1.Unit.{} to a u64.", timestamp_key)
             }
@@ -198,6 +204,9 @@ impl Display for DBusError {
             }
             DBusError::CastOrgFreedesktopSystemd1UnitId => {
                 write!(f, "Failed to cast org.freedesktop.systemd1.Unit.Id to a string.")
+            }
+            DBusError::CastStrToPath(source) => {
+                write!(f, "{}", source)
             }
             DBusError::ConnectToBus(source) => {
                 write!(f, "Failed to connect to D-Bus bus. Cause: {}", source)
@@ -234,6 +243,7 @@ impl Error for DBusError {
             DBusError::CallOrgFreedesktopSystemd1ManagerGetUnit(source) => Some(source),
             DBusError::CallOrgFreedesktopSystemd1ManagerListUnits(source) => Some(source),
             DBusError::CallOrgFreedesktopSystemd1ManagerSubscribe(source) => Some(source),
+            DBusError::CastBusNameToStr(source) => Some(source),
             DBusError::ConnectToBus(source) => Some(source),
             DBusError::GetOrgFreedesktopSystemd1UnitId(source) => Some(source),
             DBusError::RemoveMatch(_, source) => Some(source),
