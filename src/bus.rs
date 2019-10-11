@@ -265,7 +265,7 @@ impl BusWatcher {
                         );
 
                     let header_bus_name = notifier.get_bus_name();
-                    let header_path = make_path_like_bus_name(&header_bus_name)?;
+                    let header_path = cast_bus_name_to_path(&header_bus_name)?;
                     let header_interface = wrap_interface_for_killjoy_notifier();
                     let header_member = wrap_member_for_notify();
 
@@ -523,7 +523,7 @@ fn get_active_state(unit_props: &UnitProps) -> Result<ActiveState, CrateDBusErro
 //
 // Will return an error if unable to make a string from the contents of `bus_name`, or if the Path
 // object being created does not contain a valid path name.
-fn make_path_like_bus_name(bus_name: &BusName) -> Result<Path<'static>, CrateDBusError> {
+fn cast_bus_name_to_path(bus_name: &BusName) -> Result<Path<'static>, CrateDBusError> {
     let mut path_str = bus_name
         .as_cstr()
         .to_str()
@@ -571,10 +571,10 @@ mod tests {
     use crate::settings::{test_utils, Expression};
 
     #[test]
-    fn test_make_path_like_bus_name() {
+    fn test_cast_bus_name_to_path() {
         let bus_name = BusName::new(BUS_NAME_FOR_SYSTEMD)
             .expect(&format!("Failed to create BusName from {}", BUS_NAME_FOR_SYSTEMD)[..]);
-        let path = make_path_like_bus_name(&bus_name).expect("Failed to cast bus name to path.");
+        let path = cast_bus_name_to_path(&bus_name).expect("Failed to cast bus name to path.");
         let path_str = path
             .as_cstr()
             .to_str()
