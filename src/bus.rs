@@ -9,7 +9,7 @@ use dbus::{
     SignalArgs,
 };
 
-use crate::error::DBusError as CrateDBusError;
+use crate::error::Error as CrateError;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusProperties;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusPropertiesPropertiesChanged as PropertiesChanged;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1Manager;
@@ -46,8 +46,8 @@ impl BusWatcher {
         settings: Settings,
         loop_once: bool,
         loop_timeout: u32,
-    ) -> Result<Self, CrateDBusError> {
-        let connection = Connection::get_private(bus_type).map_err(CrateDBusError::ConnectToBus)?;
+    ) -> Result<Self, CrateError> {
+        let connection = Connection::get_private(bus_type).map_err(CrateError::ConnectToBus)?;
         let settings = settings;
         Ok(BusWatcher {
             loop_once,
@@ -136,7 +136,7 @@ impl BusWatcher {
     // Startup is complete when all unicast messages requesting unit states have been received a
     // response and been processed. After that point, all `PropertiesChanged` signals are either
     // out-of-date and discarded, or newer and useful.
-    pub fn run(&self) -> Result<(), CrateDBusError> {
+    pub fn run(&self) -> Result<(), CrateError> {
         self.call_manager_subscribe()?;
 
         // D-Bus inserts a org.freedesktop.DBus.NameAcquired signal into the message queue of new
@@ -208,28 +208,28 @@ impl BusWatcher {
     fn call_properties_get_all(
         &self,
         unit_path: &Path,
-    ) -> Result<HashMap<String, Variant<Box<dyn RefArg + 'static>>>, CrateDBusError> {
+    ) -> Result<HashMap<String, Variant<Box<dyn RefArg + 'static>>>, CrateError> {
         self.get_conn_path(unit_path)
             .get_all("org.freedesktop.systemd1.Unit")
-            .map_err(CrateDBusError::CallOrgFreedesktopDBusPropertiesGetAll)
+            .map_err(CrateError::CallOrgFreedesktopDBusPropertiesGetAll)
     }
 
     // Call `org.freedesktop.systemd1.Manager.GetUnit`.
     //
     // Return the systemd unit path for `unit_name`, or an error if the unit is not loaded.
-    fn call_manager_get_unit(&self, unit_name: &str) -> Result<Path, CrateDBusError> {
+    fn call_manager_get_unit(&self, unit_name: &str) -> Result<Path, CrateError> {
         self.get_conn_path(&wrap_path_for_systemd())
             .get_unit(unit_name)
-            .map_err(CrateDBusError::CallOrgFreedesktopSystemd1ManagerGetUnit)
+            .map_err(CrateError::CallOrgFreedesktopSystemd1ManagerGetUnit)
     }
 
     // Call `org.freedesktop.systemd1.Manager.Subscribe`.
     //
     // By default, the manager will *not* emit most signals. Enable them.
-    fn call_manager_subscribe(&self) -> Result<(), CrateDBusError> {
+    fn call_manager_subscribe(&self) -> Result<(), CrateError> {
         self.get_conn_path(&wrap_path_for_systemd())
             .subscribe()
-            .map_err(CrateDBusError::CallOrgFreedesktopSystemd1ManagerSubscribe)
+            .map_err(CrateError::CallOrgFreedesktopSystemd1ManagerSubscribe)
     }
 
     // Delete the given unit's state from `unit_states`, if present.
@@ -245,10 +245,8 @@ impl BusWatcher {
         &'a self,
         unit_name: &'a str,
         real_ts: RealtimeTimestamp,
-    ) -> impl Fn(&UnitStateMachine, Option<ActiveState>) -> Result<(), CrateDBusError> + 'a {
-        move |usm: &UnitStateMachine,
-              old_state: Option<ActiveState>|
-              -> Result<(), CrateDBusError> {
+    ) -> impl Fn(&UnitStateMachine, Option<ActiveState>) -> Result<(), CrateError> + 'a {
+        move |usm: &UnitStateMachine, old_state: Option<ActiveState>| -> Result<(), CrateError> {
             let active_state = usm.active_state();
             let matching_rules: Vec<&Rule> = self.settings.rules.iter().collect();
             let matching_rules = get_rules_matching_name(&matching_rules, &unit_name);
@@ -290,7 +288,7 @@ impl BusWatcher {
                     );
 
                     let conn = Connection::get_private(notifier.bus_type)
-                        .map_err(CrateDBusError::ConnectToBus)?;
+                        .map_err(CrateError::ConnectToBus)?;
                     if let Err(err) = conn.send_with_reply_and_block(msg, 5000) {
                         eprintln!(
                             "Error occurred when contacting notifier \"{}\": {}",
@@ -320,11 +318,11 @@ impl BusWatcher {
     // Call `org.freedesktop.systemd1.Manager.ListUnits`.
     //
     // This method "returns an array with all currently loaded units."
-    fn call_manager_list_units(&self) -> Result<Vec<String>, CrateDBusError> {
+    fn call_manager_list_units(&self) -> Result<Vec<String>, CrateError> {
         self.get_conn_path(&wrap_path_for_systemd())
             .list_units()
             .map(|units| units.into_iter().map(|unit| unit.0).collect())
-            .map_err(CrateDBusError::CallOrgFreedesktopSystemd1ManagerListUnits)
+            .map_err(CrateError::CallOrgFreedesktopSystemd1ManagerListUnits)
     }
 
     // Handle the UnitNew signal.
@@ -335,7 +333,7 @@ impl BusWatcher {
         &self,
         msg_body: &UnitNew,
         unit_states: &mut HashMap<String, UnitStateMachine>,
-    ) -> Result<(), CrateDBusError> {
+    ) -> Result<(), CrateError> {
         let borrowed_rules: Vec<&Rule> = self.settings.rules.iter().collect();
         let unit_name: &String = &msg_body.arg0;
         let unit_path: &Path = &msg_body.arg1;
@@ -384,14 +382,14 @@ impl BusWatcher {
         msg: &Message,
         msg_body: &PropertiesChanged,
         unit_states: &mut HashMap<String, UnitStateMachine>,
-    ) -> Result<(), CrateDBusError> {
+    ) -> Result<(), CrateError> {
         // We only care about the properties exposed by this interface.
         if msg_body.interface != INTERFACE_FOR_SYSTEMD_UNIT {
             return Ok(());
         }
 
         // Get path of unit that changed.
-        let unit_path: Path = msg.path().ok_or_else(|| CrateDBusError::MessageLacksPath)?;
+        let unit_path: Path = msg.path().ok_or_else(|| CrateError::MessageLacksPath)?;
 
         // Translate the signal's path into a unit name.
         //
@@ -401,17 +399,17 @@ impl BusWatcher {
         let unit_name: String = self
             .get_conn_path(&unit_path)
             .get(INTERFACE_FOR_SYSTEMD_UNIT, "Id")
-            .map_err(CrateDBusError::GetOrgFreedesktopSystemd1UnitId)?
+            .map_err(CrateError::GetOrgFreedesktopSystemd1UnitId)?
             .0
             .as_str()
-            .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitId)?
+            .ok_or_else(|| CrateError::CastOrgFreedesktopSystemd1UnitId)?
             .to_string();
 
         // If the ActiveState property is missing, assume it didn't change.
         match self.upsert_unit_states(&unit_name[..], &msg_body.changed_properties, unit_states) {
             Ok(_) => Ok(()),
             Err(err) => match err {
-                CrateDBusError::PropertiesLacksActiveState => Ok(()),
+                CrateError::PropertiesLacksActiveState => Ok(()),
                 _ => Err(err),
             },
         }
@@ -423,7 +421,7 @@ impl BusWatcher {
         unit_name: &str,
         unit_props: &UnitProps,
         unit_states: &mut HashMap<String, UnitStateMachine>,
-    ) -> Result<(), CrateDBusError> {
+    ) -> Result<(), CrateError> {
         // Get unit's current ActiveState, and time at which it entered that state.
         let active_state: ActiveState = get_active_state(&unit_props)?;
         let real_ts = timestamp::get_realtime_timestamp(active_state, unit_props)?;
@@ -446,42 +444,42 @@ impl BusWatcher {
     }
 
     // Subscribe to the `org.freedesktop.systemd1.Manager.UnitNew` signal.
-    fn subscribe_manager_unit_new(&self) -> Result<(), CrateDBusError> {
+    fn subscribe_manager_unit_new(&self) -> Result<(), CrateError> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = wrap_path_for_systemd();
         let match_str: String = UnitNew::match_str(Some(&bus_name), Some(&path));
         self.connection
             .add_match(&match_str)
-            .map_err(|err: DBusError| CrateDBusError::AddMatch(match_str, err))
+            .map_err(|err: DBusError| CrateError::AddSignalMatch(match_str, err))
     }
 
     // Subscribe to the `org.freedesktop.systemd1.Manager.UnitRemoved` signal.
-    fn subscribe_manager_unit_removed(&self) -> Result<(), CrateDBusError> {
+    fn subscribe_manager_unit_removed(&self) -> Result<(), CrateError> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = wrap_path_for_systemd();
         let match_str: String = UnitRemoved::match_str(Some(&bus_name), Some(&path));
         self.connection
             .add_match(&UnitRemoved::match_str(Some(&bus_name), Some(&path)))
-            .map_err(|err: DBusError| CrateDBusError::AddMatch(match_str, err))
+            .map_err(|err: DBusError| CrateError::AddSignalMatch(match_str, err))
     }
 
     // Subscribe to the `org.freedesktop.DBus.Properties.PropertiesChanged` signal.
-    fn subscribe_properties_changed(&self, unit_path: &Path) -> Result<(), CrateDBusError> {
+    fn subscribe_properties_changed(&self, unit_path: &Path) -> Result<(), CrateError> {
         let bus_name = wrap_bus_name_for_systemd();
         let match_str: String = PropertiesChanged::match_str(Some(&bus_name), Some(&unit_path));
         self.connection
             .add_match(&match_str)
-            .map_err(|err: DBusError| CrateDBusError::AddMatch(match_str, err))
+            .map_err(|err: DBusError| CrateError::AddSignalMatch(match_str, err))
     }
 
     // Unsubscribe from the `org.freedesktop.DBus.Properties.PropertiesChanged` signal.
-    fn unsubscribe_properties_changed(&self, unit_path: &Path) -> Result<(), CrateDBusError> {
+    fn unsubscribe_properties_changed(&self, unit_path: &Path) -> Result<(), CrateError> {
         let bus_name = wrap_bus_name_for_systemd();
         let match_str: String = PropertiesChanged::match_str(Some(&bus_name), Some(&unit_path));
         self.connection
             .remove_match(&match_str)
             .map(|_| ())
-            .map_err(|err: DBusError| CrateDBusError::RemoveMatch(match_str, err))
+            .map_err(|err: DBusError| CrateError::RemoveSignalMatch(match_str, err))
     }
 }
 
@@ -508,30 +506,29 @@ fn get_rules_matching_active_state<'a>(rules: &[&'a Rule], target: ActiveState) 
 }
 
 // Return the value of the ActiveState property.
-fn get_active_state(unit_props: &UnitProps) -> Result<ActiveState, CrateDBusError> {
+fn get_active_state(unit_props: &UnitProps) -> Result<ActiveState, CrateError> {
     let active_state_str: &str = unit_props
         .get("ActiveState")
-        .ok_or_else(|| CrateDBusError::PropertiesLacksActiveState)?
+        .ok_or_else(|| CrateError::PropertiesLacksActiveState)?
         .0
         .as_str()
-        .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitActiveState)?;
+        .ok_or_else(|| CrateError::CastOrgFreedesktopSystemd1UnitActiveState)?;
     ActiveState::try_from(active_state_str)
-        .map_err(CrateDBusError::DecodeOrgFreedesktopSystemd1UnitActiveState)
 }
 
 // Given a bus name foo.bar.Biz1, make path /foo/bar/Biz1.
 //
 // Will return an error if unable to make a string from the contents of `bus_name`, or if the Path
 // object being created does not contain a valid path name.
-fn cast_bus_name_to_path(bus_name: &BusName) -> Result<Path<'static>, CrateDBusError> {
+fn cast_bus_name_to_path(bus_name: &BusName) -> Result<Path<'static>, CrateError> {
     let mut path_str = bus_name
         .as_cstr()
         .to_str()
-        .map_err(CrateDBusError::CastBusNameToStr)?
+        .map_err(CrateError::CastBusNameToStr)?
         .replace(".", "/");
     path_str.insert(0, '/');
     let path = Path::new(path_str)
-        .map_err(CrateDBusError::CastStrToPath)?
+        .map_err(CrateError::CastStrToPath)?
         .to_owned();
     Ok(path)
 }

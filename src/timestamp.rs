@@ -1,7 +1,7 @@
 // Logic for working with timestamps.
 
 use crate::bus::UnitProps;
-use crate::error::DBusError as CrateDBusError;
+use crate::error::Error as CrateError;
 use crate::unit::ActiveState;
 
 // The number of usec since an arbitrary point in the past.
@@ -20,14 +20,14 @@ pub struct RealtimeTimestamp(pub u64);
 pub fn get_monotonic_timestamp(
     active_state: ActiveState,
     unit_props: &UnitProps,
-) -> Result<MonotonicTimestamp, CrateDBusError> {
+) -> Result<MonotonicTimestamp, CrateError> {
     let timestamp_key: &'static str = get_monotonic_timestamp_key(active_state);
     unit_props
         .get(timestamp_key)
-        .ok_or_else(|| CrateDBusError::PropertiesLacksTimestamp(active_state, timestamp_key))?
+        .ok_or_else(|| CrateError::PropertiesLacksTimestamp(active_state, timestamp_key))?
         .0
         .as_u64()
-        .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitTimestamp(timestamp_key))
+        .ok_or_else(|| CrateError::CastOrgFreedesktopSystemd1UnitTimestamp(timestamp_key))
         .map(MonotonicTimestamp)
 }
 
@@ -46,14 +46,14 @@ fn get_monotonic_timestamp_key(active_state: ActiveState) -> &'static str {
 pub fn get_realtime_timestamp(
     active_state: ActiveState,
     unit_props: &UnitProps,
-) -> Result<RealtimeTimestamp, CrateDBusError> {
+) -> Result<RealtimeTimestamp, CrateError> {
     let timestamp_key: &'static str = get_realtime_timestamp_key(active_state);
     unit_props
         .get(timestamp_key)
-        .ok_or_else(|| CrateDBusError::PropertiesLacksTimestamp(active_state, timestamp_key))?
+        .ok_or_else(|| CrateError::PropertiesLacksTimestamp(active_state, timestamp_key))?
         .0
         .as_u64()
-        .ok_or_else(|| CrateDBusError::CastOrgFreedesktopSystemd1UnitTimestamp(timestamp_key))
+        .ok_or_else(|| CrateError::CastOrgFreedesktopSystemd1UnitTimestamp(timestamp_key))
         .map(RealtimeTimestamp)
 }
 

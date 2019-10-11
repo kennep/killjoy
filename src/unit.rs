@@ -3,7 +3,7 @@
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
-use crate::error::{DBusError, ParseAsActiveStateError};
+use crate::error::Error as CrateError;
 use crate::timestamp::MonotonicTimestamp;
 
 // The possible values for a unit's `ActiveState` attribute.
@@ -40,7 +40,7 @@ impl Display for ActiveState {
 
 // Useful when reading from a configuration file.
 impl TryFrom<&str> for ActiveState {
-    type Error = ParseAsActiveStateError;
+    type Error = CrateError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
@@ -49,10 +49,7 @@ impl TryFrom<&str> for ActiveState {
             "deactivating" => Ok(ActiveState::Deactivating),
             "failed" => Ok(ActiveState::Failed),
             "inactive" => Ok(ActiveState::Inactive),
-            _ => Err(ParseAsActiveStateError::new(format!(
-                "Failed to parse string as ActiveState: {}",
-                value,
-            ))),
+            _ => Err(CrateError::InvalidActiveState(value.to_string())),
         }
     }
 }
@@ -82,9 +79,9 @@ impl UnitStateMachine {
         active_state: ActiveState,
         mono_ts: MonotonicTimestamp,
         on_change: &T,
-    ) -> Result<Self, DBusError>
+    ) -> Result<Self, CrateError>
     where
-        T: Fn(&UnitStateMachine, Option<ActiveState>) -> Result<(), DBusError>,
+        T: Fn(&UnitStateMachine, Option<ActiveState>) -> Result<(), CrateError>,
     {
         let usm = UnitStateMachine {
             active_state,
@@ -103,9 +100,9 @@ impl UnitStateMachine {
         active_state: ActiveState,
         mono_ts: MonotonicTimestamp,
         on_change: &T,
-    ) -> Result<(), DBusError>
+    ) -> Result<(), CrateError>
     where
-        T: Fn(&UnitStateMachine, Option<ActiveState>) -> Result<(), DBusError>,
+        T: Fn(&UnitStateMachine, Option<ActiveState>) -> Result<(), CrateError>,
     {
         if self.mono_ts.0 < mono_ts.0 {
             self.mono_ts = mono_ts;
@@ -127,7 +124,7 @@ impl UnitStateMachine {
 mod tests {
     use super::*;
 
-    fn null_on_change(_: &UnitStateMachine, _: Option<ActiveState>) -> Result<(), DBusError> {
+    fn null_on_change(_: &UnitStateMachine, _: Option<ActiveState>) -> Result<(), CrateError> {
         Ok(())
     }
 

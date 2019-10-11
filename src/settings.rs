@@ -11,7 +11,7 @@ use regex::Regex;
 use serde::Deserialize;
 use xdg::BaseDirectories;
 
-use crate::error::SettingsFileError;
+use crate::error::Error as CrateError;
 use crate::unit::ActiveState;
 
 // The expressions that a user may use to match unit names.
@@ -53,7 +53,7 @@ impl Notifier {
     // Create a new notifier.
     //
     // Return an error if any arguments are invalid.
-    pub fn new(bus_name: &str, bus_type: BusType) -> Result<Self, SettingsFileError> {
+    pub fn new(bus_name: &str, bus_type: BusType) -> Result<Self, CrateError> {
         let new_obj = Self {
             bus_name: bus_name.to_owned(),
             bus_type,
@@ -69,14 +69,14 @@ impl Notifier {
         )
     }
 
-    fn maybe_get_bus_name(&self) -> Result<BusName, SettingsFileError> {
+    fn maybe_get_bus_name(&self) -> Result<BusName, CrateError> {
         BusName::new(&self.bus_name[..])
-            .map_err(|_| SettingsFileError::InvalidBusName(self.bus_name.to_owned()))
+            .map_err(|_| CrateError::InvalidBusName(self.bus_name.to_owned()))
     }
 }
 
 impl TryFrom<SerdeNotifier> for Notifier {
-    type Error = SettingsFileError;
+    type Error = CrateError;
 
     fn try_from(value: SerdeNotifier) -> Result<Self, Self::Error> {
         let notifier = Notifier::new(&value.bus_name, decode_bus_type_str(&value.bus_type)?)?;
@@ -98,14 +98,13 @@ pub struct Rule {
 }
 
 impl TryFrom<SerdeRule> for Rule {
-    type Error = SettingsFileError;
+    type Error = CrateError;
 
     fn try_from(value: SerdeRule) -> Result<Self, Self::Error> {
         let mut active_states: HashSet<ActiveState> = HashSet::new();
         for active_state_string in &value.active_states {
-            let active_state = ActiveState::try_from(&active_state_string[..]).map_err(|_| {
-                SettingsFileError::InvalidActiveState(active_state_string.to_owned())
-            })?;
+            let active_state = ActiveState::try_from(&active_state_string[..])
+                .map_err(|_| CrateError::InvalidActiveState(active_state_string.to_owned()))?;
             active_states.insert(active_state);
         }
         let active_states = active_states;
@@ -115,10 +114,10 @@ impl TryFrom<SerdeRule> for Rule {
         let expression: Expression = match &value.expression_type[..] {
             "regex" => Regex::new(&value.expression[..])
                 .map(Expression::Regex)
-                .map_err(SettingsFileError::InvalidRegex),
+                .map_err(CrateError::InvalidRegex),
             "unit name" => Ok(Expression::UnitName(value.expression.to_owned())),
             "unit type" => Ok(Expression::UnitType(value.expression.to_owned())),
-            other => Err(SettingsFileError::InvalidExpressionType(other.to_owned())),
+            other => Err(CrateError::InvalidExpressionType(other.to_owned())),
         }?;
 
         let notifiers = value.notifiers.to_owned();
@@ -152,15 +151,15 @@ impl Settings {
     //     didn't match the settings file schema; or so on.
     // *   The settings object contained semantically invalid data. Maybe a `"bus_type"` key was set
     //     to a value such as `"foo"`, or so on.
-    pub fn new<T: Read>(reader: T) -> Result<Self, SettingsFileError> {
-        let serde_settings: SerdeSettings =
-            serde_json::from_reader(reader).map_err(SettingsFileError::DeserializationFailed)?;
+    pub fn new<T: Read>(reader: T) -> Result<Self, CrateError> {
+        let serde_settings: SerdeSettings = serde_json::from_reader(reader)
+            .map_err(CrateError::SettingsFileDeserializationFailed)?;
         Self::try_from(serde_settings)
     }
 }
 
 impl TryFrom<SerdeSettings> for Settings {
-    type Error = SettingsFileError;
+    type Error = CrateError;
 
     fn try_from(value: SerdeSettings) -> Result<Self, Self::Error> {
         let mut notifiers: HashMap<String, Notifier> = HashMap::new();
@@ -175,7 +174,7 @@ impl TryFrom<SerdeSettings> for Settings {
             let rule = Rule::try_from(serde_rule)?;
             for notifier in &rule.notifiers {
                 if !notifiers.contains_key(notifier) {
-                    return Err(SettingsFileError::InvalidNotifier(notifier.to_owned()));
+                    return Err(CrateError::InvalidNotifier(notifier.to_owned()));
                 }
             }
             rules.push(rule);
@@ -255,12 +254,12 @@ impl Into<BusType> for HashableBusType {
     }
 }
 
-pub fn decode_bus_type_str(bus_type_str: &str) -> Result<BusType, SettingsFileError> {
+pub fn decode_bus_type_str(bus_type_str: &str) -> Result<BusType, CrateError> {
     match bus_type_str {
         "session" => Ok(BusType::Session),
         "starter" => Ok(BusType::Starter),
         "system" => Ok(BusType::System),
-        other => Err(SettingsFileError::InvalidBusType(other.to_owned())),
+        other => Err(CrateError::InvalidBusType(other.to_owned())),
     }
 }
 
@@ -281,13 +280,13 @@ pub fn get_bus_types(rules: &[Rule]) -> Vec<BusType> {
 // Search several paths for a settings file, in order of preference.
 //
 // If a file is found, return its path. Otherwise, return an error describing why.
-pub fn get_load_path() -> Result<PathBuf, SettingsFileError> {
+pub fn get_load_path() -> Result<PathBuf, CrateError> {
     let prefix = "killjoy";
     let suffix = "settings.json";
     BaseDirectories::with_prefix(prefix)
-        .map_err(|_| SettingsFileError::FileNotFound(format!("{}/{}", prefix, suffix)))?
+        .map_err(|_| CrateError::SettingsFileNotFound(format!("{}/{}", prefix, suffix)))?
         .find_config_file(suffix)
-        .ok_or_else(|| SettingsFileError::FileNotFound(format!("{}/{}", prefix, suffix)))
+        .ok_or_else(|| CrateError::SettingsFileNotFound(format!("{}/{}", prefix, suffix)))
 }
 
 // Read the configuration file into a Settings object.
@@ -297,12 +296,12 @@ pub fn get_load_path() -> Result<PathBuf, SettingsFileError> {
 // *   The file couldn't be opened. Maybe a settings file couldn't be found; or maybe a settings
 //     file was found but could not be opened.
 // *   The file contained invalid contents.
-pub fn load(path_opt: Option<&Path>) -> Result<Settings, SettingsFileError> {
+pub fn load(path_opt: Option<&Path>) -> Result<Settings, CrateError> {
     let handle_res = match path_opt {
         Some(path) => File::open(path),
         None => File::open(get_load_path()?.as_path()),
     };
-    let handle = handle_res.map_err(SettingsFileError::FileNotReadable)?;
+    let handle = handle_res.map_err(CrateError::SettingsFileNotReadable)?;
     let reader = BufReader::new(handle);
     Settings::new(reader)
 }
@@ -477,7 +476,7 @@ mod tests {
             }
         "###;
         match Settings::new(settings_str.as_bytes()) {
-            Err(SettingsFileError::DeserializationFailed(_)) => {}
+            Err(CrateError::SettingsFileDeserializationFailed(_)) => {}
             _ => panic!("expected DeserializationFailed; an extra comma has been added"),
         }
     }
@@ -504,7 +503,7 @@ mod tests {
             }
         "###;
         match Settings::new(settings_str.as_bytes()) {
-            Err(SettingsFileError::InvalidActiveState(_)) => {}
+            Err(CrateError::InvalidActiveState(_)) => {}
             _ => panic!("expected InvalidActiveState; an active state has been typo'd"),
         }
     }
@@ -531,7 +530,7 @@ mod tests {
             }
         "###;
         match Settings::new(settings_str.as_bytes()) {
-            Err(SettingsFileError::InvalidBusName(_)) => {}
+            Err(CrateError::InvalidBusName(_)) => {}
             _ => panic!("expected InvalidBusName; a bus name has been typo'd"),
         }
     }
@@ -558,7 +557,7 @@ mod tests {
             }
         "###;
         match Settings::new(settings_str.as_bytes()) {
-            Err(SettingsFileError::InvalidBusType(_)) => {}
+            Err(CrateError::InvalidBusType(_)) => {}
             _ => panic!("expected InvalidBusType; a bus type has been typo'd"),
         }
     }
@@ -585,7 +584,7 @@ mod tests {
             }
         "###;
         match Settings::new(settings_str.as_bytes()) {
-            Err(SettingsFileError::InvalidBusType(_)) => {}
+            Err(CrateError::InvalidBusType(_)) => {}
             _ => panic!("expected InvalidBusType; a bus type has been typo'd"),
         }
     }
@@ -612,7 +611,7 @@ mod tests {
             }
         "###;
         match Settings::new(settings_str.as_bytes()) {
-            Err(SettingsFileError::InvalidExpressionType(_)) => {}
+            Err(CrateError::InvalidExpressionType(_)) => {}
             _ => panic!("expected InvalidExpressionType; an expression type has been typo'd"),
         }
     }
@@ -639,7 +638,7 @@ mod tests {
             }
         "###;
         match Settings::new(settings_str.as_bytes()) {
-            Err(SettingsFileError::InvalidRegex(_)) => {}
+            Err(CrateError::InvalidRegex(_)) => {}
             _ => panic!("expected InvalidRegex; a regex has been typo'd"),
         }
     }
@@ -666,7 +665,7 @@ mod tests {
             }
         "###;
         match Settings::new(settings_str.as_bytes()) {
-            Err(SettingsFileError::InvalidNotifier(_)) => {}
+            Err(CrateError::InvalidNotifier(_)) => {}
             _ => panic!("expected InvalidNotifier; a notifier has been typo'd"),
         }
     }
