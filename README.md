@@ -177,24 +177,7 @@ foreground, or `killjoy --help` to learn about its features.
 Changelog
 ---------
 
-This section lists the notable changes in each release.
-
-### Unreleased
-
-Improve installation instructions.
-
-### 0.1.1
-
-Fix a documentation error. See
-[#20](https://github.com/Ichimonji10/killjoy/issues/20).
-
-### 0.1.0
-
-Initial release. Anecdotally, killjoy is stable enough to be useful for personal
-use. One major breaking change is likely to land in a future release: [issue
- #13](https://github.com/Ichimonji10/killjoy/issues/13). This release is being
-pushed out anyway so as to make documentation more accessible, and to ease
-packaging.
+See annotated git tags.
 
 License
 -------
