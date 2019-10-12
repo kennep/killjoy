@@ -254,13 +254,12 @@ impl BusWatcher {
 
             for matching_rule in &matching_rules {
                 for notifier_name in &matching_rule.notifiers {
-                    // This potential error can be eliminated by restructuring the settings object.
-                    // See: https://github.com/Ichimonji10/killjoy/issues/3 . In the meantime, the
-                    // error hierarchy could be flattened, and we could raise InvalidNotifier.
+                    // This error can be eliminated by restructuring the settings object. See:
+                    // https://github.com/Ichimonji10/killjoy/issues/3
                     let notifier =
-                        self.settings.notifiers.get(notifier_name).expect(
-                            &format!("Failed to get notifier named '{}'", notifier_name)[..],
-                        );
+                        self.settings.notifiers.get(notifier_name).ok_or_else(|| {
+                            CrateError::InvalidNotifier(notifier_name.to_string())
+                        })?;
 
                     let header_bus_name = notifier.get_bus_name();
                     let header_path = cast_bus_name_to_path(&header_bus_name)?;
