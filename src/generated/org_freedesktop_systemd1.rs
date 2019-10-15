@@ -363,6 +363,7 @@ pub trait OrgFreedesktopSystemd1Manager {
         Self::Err,
     >;
     fn kill_unit(&self, arg0: &str, arg1: &str, arg2: i32) -> Result<(), Self::Err>;
+    fn clean_unit(&self, arg0: &str, arg1: Vec<&str>) -> Result<(), Self::Err>;
     fn reset_failed_unit(&self, arg0: &str) -> Result<(), Self::Err>;
     fn set_unit_properties(
         &self,
@@ -661,8 +662,10 @@ pub trait OrgFreedesktopSystemd1Manager {
     fn get_default_standard_error(&self) -> Result<String, Self::Err>;
     fn get_runtime_watchdog_usec(&self) -> Result<u64, Self::Err>;
     fn set_runtime_watchdog_usec(&self, value: u64) -> Result<(), Self::Err>;
-    fn get_shutdown_watchdog_usec(&self) -> Result<u64, Self::Err>;
-    fn set_shutdown_watchdog_usec(&self, value: u64) -> Result<(), Self::Err>;
+    fn get_reboot_watchdog_usec(&self) -> Result<u64, Self::Err>;
+    fn set_reboot_watchdog_usec(&self, value: u64) -> Result<(), Self::Err>;
+    fn get_kexec_watchdog_usec(&self) -> Result<u64, Self::Err>;
+    fn set_kexec_watchdog_usec(&self, value: u64) -> Result<(), Self::Err>;
     fn get_service_watchdogs(&self) -> Result<bool, Self::Err>;
     fn set_service_watchdogs(&self, value: bool) -> Result<(), Self::Err>;
     fn get_control_group(&self) -> Result<String, Self::Err>;
@@ -671,6 +674,7 @@ pub trait OrgFreedesktopSystemd1Manager {
     fn get_default_timer_accuracy_usec(&self) -> Result<u64, Self::Err>;
     fn get_default_timeout_start_usec(&self) -> Result<u64, Self::Err>;
     fn get_default_timeout_stop_usec(&self) -> Result<u64, Self::Err>;
+    fn get_default_timeout_abort_usec(&self) -> Result<u64, Self::Err>;
     fn get_default_restart_usec(&self) -> Result<u64, Self::Err>;
     fn get_default_start_limit_interval_usec(&self) -> Result<u64, Self::Err>;
     fn get_default_start_limit_burst(&self) -> Result<u32, Self::Err>;
@@ -712,6 +716,7 @@ pub trait OrgFreedesktopSystemd1Manager {
     fn get_default_limit_rttimesoft(&self) -> Result<u64, Self::Err>;
     fn get_default_tasks_max(&self) -> Result<u64, Self::Err>;
     fn get_timer_slack_nsec(&self) -> Result<u64, Self::Err>;
+    fn get_default_oompolicy(&self) -> Result<String, Self::Err>;
 }
 
 impl<'a, C: ::std::ops::Deref<Target = dbus::Connection>> OrgFreedesktopSystemd1Manager
@@ -994,6 +999,20 @@ impl<'a, C: ::std::ops::Deref<Target = dbus::Connection>> OrgFreedesktopSystemd1
                 i.append(arg0);
                 i.append(arg1);
                 i.append(arg2);
+            },
+        )?;
+        m.as_result()?;
+        Ok(())
+    }
+
+    fn clean_unit(&self, arg0: &str, arg1: Vec<&str>) -> Result<(), Self::Err> {
+        let mut m = self.method_call_with_args(
+            &"org.freedesktop.systemd1.Manager".into(),
+            &"CleanUnit".into(),
+            |msg| {
+                let mut i = arg::IterAppend::new(msg);
+                i.append(arg0);
+                i.append(arg1);
             },
         )?;
         m.as_result()?;
@@ -2460,11 +2479,19 @@ impl<'a, C: ::std::ops::Deref<Target = dbus::Connection>> OrgFreedesktopSystemd1
         )
     }
 
-    fn get_shutdown_watchdog_usec(&self) -> Result<u64, Self::Err> {
+    fn get_reboot_watchdog_usec(&self) -> Result<u64, Self::Err> {
         <Self as dbus::stdintf::org_freedesktop_dbus::Properties>::get(
             &self,
             "org.freedesktop.systemd1.Manager",
-            "ShutdownWatchdogUSec",
+            "RebootWatchdogUSec",
+        )
+    }
+
+    fn get_kexec_watchdog_usec(&self) -> Result<u64, Self::Err> {
+        <Self as dbus::stdintf::org_freedesktop_dbus::Properties>::get(
+            &self,
+            "org.freedesktop.systemd1.Manager",
+            "KExecWatchdogUSec",
         )
     }
 
@@ -2521,6 +2548,14 @@ impl<'a, C: ::std::ops::Deref<Target = dbus::Connection>> OrgFreedesktopSystemd1
             &self,
             "org.freedesktop.systemd1.Manager",
             "DefaultTimeoutStopUSec",
+        )
+    }
+
+    fn get_default_timeout_abort_usec(&self) -> Result<u64, Self::Err> {
+        <Self as dbus::stdintf::org_freedesktop_dbus::Properties>::get(
+            &self,
+            "org.freedesktop.systemd1.Manager",
+            "DefaultTimeoutAbortUSec",
         )
     }
 
@@ -2852,6 +2887,14 @@ impl<'a, C: ::std::ops::Deref<Target = dbus::Connection>> OrgFreedesktopSystemd1
         )
     }
 
+    fn get_default_oompolicy(&self) -> Result<String, Self::Err> {
+        <Self as dbus::stdintf::org_freedesktop_dbus::Properties>::get(
+            &self,
+            "org.freedesktop.systemd1.Manager",
+            "DefaultOOMPolicy",
+        )
+    }
+
     fn set_log_level(&self, value: String) -> Result<(), Self::Err> {
         <Self as dbus::stdintf::org_freedesktop_dbus::Properties>::set(
             &self,
@@ -2879,11 +2922,20 @@ impl<'a, C: ::std::ops::Deref<Target = dbus::Connection>> OrgFreedesktopSystemd1
         )
     }
 
-    fn set_shutdown_watchdog_usec(&self, value: u64) -> Result<(), Self::Err> {
+    fn set_reboot_watchdog_usec(&self, value: u64) -> Result<(), Self::Err> {
         <Self as dbus::stdintf::org_freedesktop_dbus::Properties>::set(
             &self,
             "org.freedesktop.systemd1.Manager",
-            "ShutdownWatchdogUSec",
+            "RebootWatchdogUSec",
+            value,
+        )
+    }
+
+    fn set_kexec_watchdog_usec(&self, value: u64) -> Result<(), Self::Err> {
+        <Self as dbus::stdintf::org_freedesktop_dbus::Properties>::set(
+            &self,
+            "org.freedesktop.systemd1.Manager",
+            "KExecWatchdogUSec",
             value,
         )
     }
@@ -3170,6 +3222,21 @@ where
     let m = m.in_arg(("", "s"));
     let m = m.in_arg(("", "s"));
     let m = m.in_arg(("", "i"));
+    let i = i.add_m(m);
+
+    let fclone = f.clone();
+    let h = move |minfo: &tree::MethodInfo<tree::MTFn<D>, D>| {
+        let mut i = minfo.msg.iter_init();
+        let arg0: &str = i.read()?;
+        let arg1: Vec<&str> = i.read()?;
+        let d = fclone(minfo);
+        d.clean_unit(arg0, arg1)?;
+        let rm = minfo.msg.method_return();
+        Ok(vec![rm])
+    };
+    let m = factory.method("CleanUnit", Default::default(), h);
+    let m = m.in_arg(("", "s"));
+    let m = m.in_arg(("", "as"));
     let i = i.add_m(m);
 
     let fclone = f.clone();
@@ -4621,20 +4688,38 @@ where
     });
     let i = i.add_p(p);
 
-    let p = factory.property::<u64, _>("ShutdownWatchdogUSec", Default::default());
+    let p = factory.property::<u64, _>("RebootWatchdogUSec", Default::default());
     let p = p.access(tree::Access::ReadWrite);
     let fclone = f.clone();
     let p = p.on_get(move |a, pinfo| {
         let minfo = pinfo.to_method_info();
         let d = fclone(&minfo);
-        a.append(d.get_shutdown_watchdog_usec()?);
+        a.append(d.get_reboot_watchdog_usec()?);
         Ok(())
     });
     let fclone = f.clone();
     let p = p.on_set(move |iter, pinfo| {
         let minfo = pinfo.to_method_info();
         let d = fclone(&minfo);
-        d.set_shutdown_watchdog_usec(iter.read()?)?;
+        d.set_reboot_watchdog_usec(iter.read()?)?;
+        Ok(())
+    });
+    let i = i.add_p(p);
+
+    let p = factory.property::<u64, _>("KExecWatchdogUSec", Default::default());
+    let p = p.access(tree::Access::ReadWrite);
+    let fclone = f.clone();
+    let p = p.on_get(move |a, pinfo| {
+        let minfo = pinfo.to_method_info();
+        let d = fclone(&minfo);
+        a.append(d.get_kexec_watchdog_usec()?);
+        Ok(())
+    });
+    let fclone = f.clone();
+    let p = p.on_set(move |iter, pinfo| {
+        let minfo = pinfo.to_method_info();
+        let d = fclone(&minfo);
+        d.set_kexec_watchdog_usec(iter.read()?)?;
         Ok(())
     });
     let i = i.add_p(p);
@@ -4719,6 +4804,17 @@ where
         let minfo = pinfo.to_method_info();
         let d = fclone(&minfo);
         a.append(d.get_default_timeout_stop_usec()?);
+        Ok(())
+    });
+    let i = i.add_p(p);
+
+    let p = factory.property::<u64, _>("DefaultTimeoutAbortUSec", Default::default());
+    let p = p.access(tree::Access::Read);
+    let fclone = f.clone();
+    let p = p.on_get(move |a, pinfo| {
+        let minfo = pinfo.to_method_info();
+        let d = fclone(&minfo);
+        a.append(d.get_default_timeout_abort_usec()?);
         Ok(())
     });
     let i = i.add_p(p);
@@ -5170,6 +5266,17 @@ where
         let minfo = pinfo.to_method_info();
         let d = fclone(&minfo);
         a.append(d.get_timer_slack_nsec()?);
+        Ok(())
+    });
+    let i = i.add_p(p);
+
+    let p = factory.property::<&str, _>("DefaultOOMPolicy", Default::default());
+    let p = p.access(tree::Access::Read);
+    let fclone = f.clone();
+    let p = p.on_get(move |a, pinfo| {
+        let minfo = pinfo.to_method_info();
+        let d = fclone(&minfo);
+        a.append(d.get_default_oompolicy()?);
         Ok(())
     });
     let i = i.add_p(p);
