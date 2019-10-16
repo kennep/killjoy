@@ -6,7 +6,8 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
-use dbus::{BusName, BusType};
+use dbus::channel::BusType;
+use dbus::strings::BusName;
 use regex::Regex;
 use serde::Deserialize;
 use xdg::BaseDirectories;
@@ -224,36 +225,6 @@ struct SerdeSettings {
     rules: Vec<SerdeRule>,
 }
 
-// This struct is a hack. See get_bus_types().
-#[derive(PartialEq, Eq, Hash)]
-enum HashableBusType {
-    Session,
-    Starter,
-    System,
-}
-
-// This impl is a hack. See get_bus_types().
-impl From<BusType> for HashableBusType {
-    fn from(value: BusType) -> Self {
-        match value {
-            BusType::Session => HashableBusType::Session,
-            BusType::Starter => HashableBusType::Starter,
-            BusType::System => HashableBusType::System,
-        }
-    }
-}
-
-// This impl is a hack. See get_bus_types().
-impl Into<BusType> for HashableBusType {
-    fn into(self) -> BusType {
-        match self {
-            HashableBusType::Session => BusType::Session,
-            HashableBusType::Starter => BusType::Starter,
-            HashableBusType::System => BusType::System,
-        }
-    }
-}
-
 pub fn decode_bus_type_str(bus_type_str: &str) -> Result<BusType, CrateError> {
     match bus_type_str {
         "session" => Ok(BusType::Session),
@@ -264,17 +235,8 @@ pub fn decode_bus_type_str(bus_type_str: &str) -> Result<BusType, CrateError> {
 }
 
 // Get a deduplicated list of D-Bus bus types in the given list of rules.
-pub fn get_bus_types(rules: &[Rule]) -> Vec<BusType> {
-    // The conversion from BusType → HashableBusType → BusType is a hack. It's done because this
-    // method should deduplicate BusType values, but BusType doesn't implement the traits necessary
-    // to create a HashSet<BusType>.
-    rules
-        .iter()
-        .map(|rule: &Rule| HashableBusType::from(rule.bus_type))
-        .collect::<HashSet<HashableBusType>>()
-        .into_iter()
-        .map(|hashable_bus_type: HashableBusType| hashable_bus_type.into())
-        .collect()
+pub fn get_bus_types(rules: &[Rule]) -> HashSet<BusType> {
+    rules.iter().map(|rule: &Rule| rule.bus_type).collect()
 }
 
 // Search several paths for a settings file, in order of preference.

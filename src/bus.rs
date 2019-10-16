@@ -2,15 +2,17 @@
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::time::Duration;
 
 use dbus::arg::{RefArg, Variant};
-use dbus::{
-    BusName, BusType, ConnPath, Connection, Error as DBusError, Interface, Member, Message, Path,
-    SignalArgs,
-};
+use dbus::blocking::stdintf::org_freedesktop_dbus::Properties;
+use dbus::blocking::{BlockingSender, Connection, Proxy};
+use dbus::channel::BusType;
+use dbus::message::SignalArgs;
+use dbus::strings::{BusName, Interface, Member};
+use dbus::{Error as DBusError, Message, Path};
 
 use crate::error::Error as CrateError;
-use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusProperties;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopDBusPropertiesPropertiesChanged as PropertiesChanged;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1Manager;
 use crate::generated::org_freedesktop_systemd1::OrgFreedesktopSystemd1ManagerUnitNew as UnitNew;
@@ -47,7 +49,12 @@ impl BusWatcher {
         loop_once: bool,
         loop_timeout: u32,
     ) -> Result<Self, CrateError> {
-        let connection = Connection::get_private(bus_type).map_err(CrateError::ConnectToBus)?;
+        let connection = match bus_type {
+            BusType::Session => Connection::new_session(),
+            BusType::System => Connection::new_system(),
+            BusType::Starter => panic!("Can only connect to session or system bus."),
+        }
+        .map_err(CrateError::ConnectToBus)?;
         let settings = settings;
         Ok(BusWatcher {
             loop_once,
@@ -139,10 +146,6 @@ impl BusWatcher {
     pub fn run(&self) -> Result<(), CrateError> {
         self.call_manager_subscribe()?;
 
-        // D-Bus inserts a org.freedesktop.DBus.NameAcquired signal into the message queue of new
-        // connections. Discard it before subscribing to any other signals.
-        self.connection.incoming(1000).next();
-
         // It's important to subscribe to UnitRemoved before UnitNew. Doing so prevents the
         // following scenario:
         //
@@ -180,8 +183,33 @@ impl BusWatcher {
         }
 
         // Infinitely process Unit{Removed,New} signals.
+        {
+            let proxy = self.connection.with_proxy(
+                wrap_bus_name_for_systemd(),
+                wrap_path_for_systemd(),
+                Duration::from_secs(1),
+            );
+            // FIXME: WTF is this callback supposed to look like? The example is rather bare.
+            // https://github.com/diwic/dbus-rs/blob/master/dbus/examples/match_signal.rs
+            proxy.match_signal(|func, _: &Connection, _: &Message| {
+                true // the signal match is removed if the callback returns false
+            });
+        }
         loop {
-            for msg in self.connection.incoming(self.loop_timeout) {
+            self.connection
+                .process(Duration::from_millis(self.loop_timeout.into()))
+                .expect("Failed to process incoming message.");
+            if self.loop_once {
+                return Ok(());
+            }
+        }
+
+        /*
+        loop {
+            for msg in self
+                .connection
+                .incoming(Duration::from_millis(self.loop_timeout))
+            {
                 if let Some(msg_body) = UnitNew::from_message(&msg) {
                     self.handle_unit_new(&msg_body, &mut unit_states)?;
                 } else if let Some(msg_body) = UnitRemoved::from_message(&msg) {
@@ -195,6 +223,7 @@ impl BusWatcher {
                 return Ok(());
             }
         }
+        */
     }
 
     // Call `org.freedesktop.DBus.Properties.GetAll`.
@@ -209,7 +238,7 @@ impl BusWatcher {
         &self,
         unit_path: &Path,
     ) -> Result<HashMap<String, Variant<Box<dyn RefArg + 'static>>>, CrateError> {
-        self.get_conn_path(unit_path)
+        self.get_proxy(unit_path)
             .get_all("org.freedesktop.systemd1.Unit")
             .map_err(CrateError::CallOrgFreedesktopDBusPropertiesGetAll)
     }
@@ -218,7 +247,7 @@ impl BusWatcher {
     //
     // Return the systemd unit path for `unit_name`, or an error if the unit is not loaded.
     fn call_manager_get_unit(&self, unit_name: &str) -> Result<Path, CrateError> {
-        self.get_conn_path(&wrap_path_for_systemd())
+        self.get_proxy(&wrap_path_for_systemd())
             .get_unit(unit_name)
             .map_err(CrateError::CallOrgFreedesktopSystemd1ManagerGetUnit)
     }
@@ -227,7 +256,7 @@ impl BusWatcher {
     //
     // By default, the manager will *not* emit most signals. Enable them.
     fn call_manager_subscribe(&self) -> Result<(), CrateError> {
-        self.get_conn_path(&wrap_path_for_systemd())
+        self.get_proxy(&wrap_path_for_systemd())
             .subscribe()
             .map_err(CrateError::CallOrgFreedesktopSystemd1ManagerSubscribe)
     }
@@ -286,9 +315,13 @@ impl BusWatcher {
                         &body_active_states,
                     );
 
-                    let conn = Connection::get_private(notifier.bus_type)
-                        .map_err(CrateError::ConnectToBus)?;
-                    if let Err(err) = conn.send_with_reply_and_block(msg, 5000) {
+                    let conn = match notifier.bus_type {
+                        BusType::Session => Connection::new_session(),
+                        BusType::System => Connection::new_system(),
+                        BusType::Starter => panic!("Can only connect to session or system bus."),
+                    }
+                    .map_err(CrateError::ConnectToBus)?;
+                    if let Err(err) = conn.send_with_reply_and_block(msg, Duration::from_secs(5)) {
                         eprintln!(
                             "Error occurred when contacting notifier \"{}\": {}",
                             notifier_name, err
@@ -300,17 +333,17 @@ impl BusWatcher {
         }
     }
 
-    // Get a `ConnPath` for `org.freedesktop.systemd1` and the given object path.
-    fn get_conn_path<'a: 'b, 'b>(&'a self, path: &'b Path) -> ConnPath<'b, &Connection> {
-        let conn = &self.connection;
+    // Get a `Proxy` for `org.freedesktop.systemd1` and the given object path.
+    fn get_proxy<'a: 'b, 'b>(&'a self, path: &'b Path) -> Proxy<'b, &Connection> {
         let bus_name = wrap_bus_name_for_systemd();
         let path = path.to_owned();
-        let timeout = 1000; // milliseconds
-        ConnPath {
-            conn,
-            dest: bus_name,
+        let timeout = Duration::from_secs(1);
+        let connection = &self.connection;
+        Proxy {
+            destination: bus_name,
             path,
             timeout,
+            connection,
         }
     }
 
@@ -318,7 +351,7 @@ impl BusWatcher {
     //
     // This method "returns an array with all currently loaded units."
     fn call_manager_list_units(&self) -> Result<Vec<String>, CrateError> {
-        self.get_conn_path(&wrap_path_for_systemd())
+        self.get_proxy(&wrap_path_for_systemd())
             .list_units()
             .map(|units| units.into_iter().map(|unit| unit.0).collect())
             .map_err(CrateError::CallOrgFreedesktopSystemd1ManagerListUnits)
@@ -396,7 +429,7 @@ impl BusWatcher {
         // /org/freedesktop/systemd1/unit/dbusss_2eservice, and it will respond. Thus, we can rely
         // on systemd to respond here.
         let unit_name: String = self
-            .get_conn_path(&unit_path)
+            .get_proxy(&unit_path)
             .get(INTERFACE_FOR_SYSTEMD_UNIT, "Id")
             .map_err(CrateError::GetOrgFreedesktopSystemd1UnitId)?
             .0
