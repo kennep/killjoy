@@ -13,4 +13,4 @@ RestrictSUIDSGID=true
 SystemCallArchitectures=native
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
