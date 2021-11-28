@@ -44,6 +44,9 @@ assets = [
     ["README.md", "usr/share/doc/killjoy/", "644"],
     ["package/settings.json", "/etc/xdg/killjoy/", "644"]
 ]
+conf-files = [
+    "/etc/xdg/killjoy/settings.json"
+]
 
 [package.metadata.deb.systemd-units]
 start = true
