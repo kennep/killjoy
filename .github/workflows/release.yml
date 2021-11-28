@@ -1,0 +1,56 @@
+
+on:
+  push:
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0
+
+name: Release
+
+jobs:
+  package:
+      strategy:
+        matrix:
+          image:
+            - 'debian:buster'   # debian/10
+            - 'debian:bullseye' # debian/11
+      name: Build Debian packages
+      runs-on: ubuntu-latest
+      container: ${{ matrix.image }}
+
+      steps:
+        - name: Set vars
+          id: setvars
+          shell: bash
+          run: |
+            # Get the operating system and release name (e.g. ubuntu and xenial) from the image name (e.g. ubuntu:xenial) by
+            # extracting only the parts before and after but not including the colon:
+            OS_NAME=${MATRIX_IMAGE%:*}
+            OS_REL=${MATRIX_IMAGE#*:}
+            echo "OS_NAME=${OS_NAME}" >> $GITHUB_ENV
+            echo "OS_REL=${OS_REL}" >> $GITHUB_ENV
+          env:
+            MATRIX_IMAGE: ${{ matrix.image }}
+
+        - name: Checkout sources
+          uses: actions/checkout@v2
+
+        - name: Set up Rust environment
+          uses: ./.github/actions/prepare-rust
+
+        - name: Install cargo-deb
+          uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505
+          with:
+            command: install
+            args: "cargo-deb"
+
+        - name: Build debian package
+          # Parse Cargo.toml with grep and cut :-(
+          run: cargo deb --deb-version `cat Cargo.toml | grep '^version'|cut '-d"' -f2`-${OS_REL}1
+
+        - name: Release
+          uses: softprops/action-gh-release@b21b43df682dab285bf5146c1955e7f3560805f8
+          with:
+            files: |
+              target/debian/*.deb
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

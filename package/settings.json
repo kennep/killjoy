@@ -1,0 +1,18 @@
+{
+    "version": 1,
+    "rules": [
+        {
+            "bus_type": "system",
+            "active_states": ["activating", "active", "deactivating", "inactive", "failed"],
+            "expression": ".service",
+            "expression_type": "unit type",
+            "notifiers": ["slack"]
+        }
+    ],
+    "notifiers": {
+        "slack": {
+            "bus_type": "system",
+            "bus_name": "com.wangpedersen.KilljoyNotifierSlack1"
+        }
+    }
+}

@@ -1,0 +1,28 @@
+name: 'Prepare Rust'
+description: 'Sets up rust'
+inputs:
+  system_packages:
+    description: 'System packages to install'
+    required: false
+    default: 'libdbus-1-dev libssl-dev pkg-config gcc curl'
+  rust_components:
+    description: 'Rust components to install'
+    required: false
+    default: 'rustfmt, clippy'
+runs:
+  using: "composite"
+  steps:
+      - name: Install required packages
+        run: |
+          set -e
+          SUDO=`which sudo 2>/dev/null` || true
+          $SUDO apt-get update
+          $SUDO apt-get install -y ${{ inputs.system_packages }}
+        shell: bash
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: ${{ inputs.rust_components }}

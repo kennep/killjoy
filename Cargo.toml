@@ -9,7 +9,8 @@ keywords = ["d-bus", "dbus", "systemd", "unit"]
 license = "GPL-3.0-or-later"
 name = "killjoy"
 readme = "README.md"
-repository = "https://github.com/Ichimonji10/killjoy"
+repository = "https://github.com/kennep/killjoy"
+homepage = "https://github.com/Ichimonji10/killjoy"
 version = "0.2.0"
 
 [dependencies]
@@ -27,3 +28,24 @@ tempfile    =  "^3.1.0"
 
 [badges]
 travis-ci = {repository = "Ichimonji10/killjoy"}
+
+[package.metadata.deb]
+maintainer = "Kenneth Wang Pedersen <kenneth@wangpedersen.com>"
+extended-description = """
+Generate slack notifications on behalf of killjoy.
+
+killjoy is a systemd unit monitoring application. It discovers systemd units and
+tracks their states. When a unit changes to a state of interest, killjoy
+contacts notifiers.
+"""
+maintainer-scripts = "package/session"
+assets = [
+    ["target/release/killjoy", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/killjoy/", "644"],
+    ["package/settings.json", "/etc/xdg/killjoy/", "644"]
+]
+
+[package.metadata.deb.systemd-units]
+start = true
+enable = true
+
