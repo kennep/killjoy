@@ -14,7 +14,7 @@ homepage = "https://github.com/Ichimonji10/killjoy"
 version = "0.2.1"
 
 [dependencies]
-clap   =  { version = "^4.3.11", features = ["derive", "cargo" ] }
+clap   =  { version = "^4.3.11", features = ["cargo"] }
 dbus   =  "^0.6.5"
 regex  =  "^1.9.0"
 serde = { version = "^1.0.167", features = ["derive"] }
