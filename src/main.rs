@@ -35,13 +35,13 @@ fn main() {
 fn handle_args() -> Result<(), Vec<CrateError>> {
     let args = cli::get_cli_args();
     match args.subcommand() {
-        ("settings", Some(sub_args)) => {
+        Some(("settings", sub_args)) => {
             handle_settings_subcommand(&sub_args).map_err(|err| vec![err])?
         }
         _ => {
-            let loop_once = args.is_present("loop-once");
+            let loop_once = args.get_one::<bool>("loop-once").unwrap();
             let loop_timeout = get_loop_timeout(&args).map_err(|err| vec![err])?;
-            handle_no_subcommand(loop_once, loop_timeout)?;
+            handle_no_subcommand(*loop_once, loop_timeout)?;
         }
     };
     Ok(())
@@ -50,8 +50,8 @@ fn handle_args() -> Result<(), Vec<CrateError>> {
 // Handle the 'settings' subcommand.
 fn handle_settings_subcommand(args: &ArgMatches) -> Result<(), CrateError> {
     match args.subcommand() {
-        ("load-path", Some(_)) => handle_settings_load_path_subcommand(),
-        ("validate", Some(sub_args)) => handle_settings_validate_subcommand(&sub_args),
+        Some(("load-path", _)) => handle_settings_load_path_subcommand(),
+        Some(("validate", sub_args)) => handle_settings_validate_subcommand(&sub_args),
         _ => Err(CrateError::UnexpectedSubcommand(
             args.subcommand_name().map(String::from),
         )),
@@ -68,7 +68,7 @@ fn handle_settings_load_path_subcommand() -> Result<(), CrateError> {
 
 // Handle the 'settings validate' subcommand.
 fn handle_settings_validate_subcommand(args: &ArgMatches) -> Result<(), CrateError> {
-    let path = args.value_of("path").map(|path_str| Path::new(path_str));
+    let path = args.get_one::<String>("path").map(|path_str| Path::new(path_str));
     settings::load(path)?;
     Ok(())
 }
@@ -114,10 +114,8 @@ fn handle_no_subcommand(loop_once: bool, loop_timeout: u32) -> Result<(), Vec<Cr
 
 // Get the `loop-timeout` argument, or return an error explaining why the getting failed.
 fn get_loop_timeout(args: &ArgMatches) -> Result<u32, CrateError> {
-    let loop_timeout: u32 = args
-        .value_of("loop-timeout")
-        .ok_or(CrateError::MissingLoopTimeoutArg)?
-        .parse::<u32>()
-        .map_err(CrateError::ParseLoopTimeoutArg)?;
+    let loop_timeout: u32 = *args
+        .get_one::<u32>("loop-timeout")
+        .ok_or(CrateError::MissingLoopTimeoutArg)?;
     Ok(loop_timeout)
 }

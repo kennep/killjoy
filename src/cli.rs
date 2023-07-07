@@ -1,45 +1,46 @@
 // Logic for interacting with the CLI.
 
 use clap;
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{Command, Arg, ArgAction, ArgMatches, value_parser};
 use regex::Regex;
 
 // Consume CLI arguments, parse them, validate them, and return the digested result.
-pub fn get_cli_args<'a>() -> ArgMatches<'a> {
+pub fn get_cli_args() -> ArgMatches {
     let help_messages = HelpMessagesFactory::new().gen_help_messages();
-    App::new("killjoy")
+    Command::new("killjoy")
         .version(clap::crate_version!())
         .author("Jeremy Audet <jerebear@protonmail.com>")
         .about("Monitor systemd units.")
         .max_term_width(100)
         .args(&[
-            Arg::with_name("loop-once")
+            Arg::new("loop-once")
                 .long("loop-once")
-                .takes_value(false)
+                .default_missing_value("false")
+                .action(ArgAction::SetTrue)
                 .help("FOR DEVELOPMENT ONLY! Run the main loop just once.")
-                .hidden(true),
-            Arg::with_name("loop-timeout")
+                .hide(true),
+            Arg::new("loop-timeout")
+                .value_parser(value_parser!(u32))
                 .long("loop-timeout")
-                .takes_value(true)
                 .default_value("10000")
                 .help("FOR DEVELOPMENT ONLY! The main loop message wait timeout, in ms.")
-                .hidden(true),
+                .hide(true),
         ])
         .subcommand(
-            SubCommand::with_name("settings")
+            Command::new("settings")
                 .about("Manage the settings file.")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .subcommand_required(true)
                 .subcommand(
-                    SubCommand::with_name("load-path")
+                    Command::new("load-path")
                         .about("Print the path to the file from which settings are loaded.")
-                        .after_help(&help_messages.settings_load_path[..]),
+                        .after_help(help_messages.settings_load_path.clone()),
                 )
                 .subcommand(
-                    SubCommand::with_name("validate")
+                    Command::new("validate")
                         .about("Validate the settings file.")
-                        .after_help(&help_messages.settings_validate[..])
+                        .after_help(help_messages.settings_validate.clone())
                         .arg(
-                            Arg::with_name("path")
+                            Arg::new("path")
                                 .help("The path to the settings file to validate."),
                         ),
                 ),

@@ -14,11 +14,11 @@ homepage = "https://github.com/Ichimonji10/killjoy"
 version = "0.2.1"
 
 [dependencies]
-clap   =  "^2.33.0"
+clap   =  { version = "^4.3.11", features = ["derive", "cargo" ] }
 dbus   =  "^0.6.5"
 regex  =  "^1.9.0"
-serde = { version = "^1.0.98", features = ["derive"] }
-serde_json  =  "^1.0.40"
+serde = { version = "^1.0.167", features = ["derive"] }
+serde_json  =  "^1.0.100"
 textwrap    =  "^0.11.0"
 xdg         =  "^2.2.0"
 
