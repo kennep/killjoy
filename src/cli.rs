@@ -15,7 +15,6 @@ pub fn get_cli_args() -> ArgMatches {
         .args(&[
             Arg::new("loop-once")
                 .long("loop-once")
-                .default_missing_value("false")
                 .action(ArgAction::SetTrue)
                 .help("FOR DEVELOPMENT ONLY! Run the main loop just once.")
                 .hide(true),
