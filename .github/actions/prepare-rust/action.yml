@@ -20,7 +20,7 @@ runs:
           $SUDO apt-get install -y ${{ inputs.system_packages }}
         shell: bash
       - name: Install stable toolchain
-        uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af
+        uses: actions-rs/toolchain@9e120dd99b0fbad1c065f686657e914e76bd7b72
         with:
           profile: minimal
           toolchain: stable

@@ -24,7 +24,7 @@ jobs:
         uses: ./.github/actions/prepare-rust
 
       - name: Run cargo check
-        uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505
+        uses: actions-rs/cargo@9e120dd99b0fbad1c065f686657e914e76bd7b72
         with:
           command: check
 
@@ -39,7 +39,7 @@ jobs:
         uses: ./.github/actions/prepare-rust
 
       - name: Run cargo test
-        uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505
+        uses: actions-rs/cargo@9e120dd99b0fbad1c065f686657e914e76bd7b72
         with:
           command: test
 
@@ -56,13 +56,13 @@ jobs:
         uses: ./.github/actions/prepare-rust
 
       - name: Run cargo fmt
-        uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505
+        uses: actions-rs/cargo@9e120dd99b0fbad1c065f686657e914e76bd7b72
         with:
           command: fmt
           args: --all -- --check
 
       - name: Run cargo clippy
-        uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505
+        uses: actions-rs/cargo@9e120dd99b0fbad1c065f686657e914e76bd7b72
         with:
           command: clippy
           args: -- -D warnings
